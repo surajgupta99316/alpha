@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
 import { captureFirstTouch } from "./attribution.js";
+import Storefront from "./Storefront.jsx";
+import CouponAdmin from "./CouponAdmin.jsx";
 
 const emptyForm = {
   productId: "",
@@ -32,11 +34,32 @@ function usePath() {
 
 export default function App() {
   const [path, navigate] = usePath();
+  const [cart, setCart] = useState(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("alpha:cart") || "[]");
+      return Array.isArray(stored) ? stored.filter((item) =>
+        item && typeof item._id === "string" && Number.isSafeInteger(item.quantity) && item.quantity > 0
+      ) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("alpha:cart", JSON.stringify(cart));
+    } catch (error) {
+      console.error("Could not save the shopping cart in this browser.", error);
+    }
+  }, [cart]);
   if (path === "/admin" || path.startsWith("/admin/")) {
+    if (path === "/admin/coupons") return <CouponAdmin navigate={navigate} />;
     return <Admin navigate={navigate} />;
   }
-  const slug = path.startsWith("/lp/") ? decodeURIComponent(path.slice(4)) : "alpha-bold";
-  return <CampaignPage key={slug} slug={slug} />;
+  if (path.startsWith("/lp/")) {
+    const slug = decodeURIComponent(path.slice(4));
+    return <CampaignPage key={slug} slug={slug} />;
+  }
+  return <Storefront path={path} cart={cart} setCart={setCart} navigate={navigate} />;
 }
 
 function CampaignPage({ slug }) {

@@ -1,4 +1,6 @@
 import LandingPage from "./models/LandingPage.js";
+import Coupon from "./models/Coupon.js";
+import Pincode from "./models/Pincode.js";
 import Product from "./models/Product.js";
 
 const products = [
@@ -9,6 +11,7 @@ const products = [
     description: "A confident, everyday signature scent.",
     price: 799,
     mrp: 1199,
+    stock: 100,
     imageUrl:
       "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=1000&q=80",
   },
@@ -19,6 +22,7 @@ const products = [
     description: "An expressive fragrance for after hours.",
     price: 899,
     mrp: 1299,
+    stock: 100,
     imageUrl:
       "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=1000&q=80",
   },
@@ -29,6 +33,7 @@ const products = [
     description: "A refined blend with a lasting impression.",
     price: 999,
     mrp: 1499,
+    stock: 100,
     imageUrl:
       "https://images.unsplash.com/photo-1590736969955-71cc94901144?auto=format&fit=crop&w=1000&q=80",
   },
@@ -39,6 +44,7 @@ const products = [
     description: "A clean, modern scent for every day.",
     price: 749,
     mrp: 1099,
+    stock: 100,
     imageUrl:
       "https://images.unsplash.com/photo-1595425970377-c9703cf48b6d?auto=format&fit=crop&w=1000&q=80",
   },
@@ -47,6 +53,58 @@ const products = [
 export async function seedDatabase() {
   for (const product of products) {
     await Product.updateOne({ slug: product.slug }, { $setOnInsert: product }, { upsert: true });
+  }
+  await Product.updateMany({ stock: { $exists: false } }, { $set: { stock: 100 } });
+
+  const pincodes = [
+    ["400001", "Mumbai", "Maharashtra", 2],
+    ["400050", "Mumbai", "Maharashtra", 2],
+    ["400051", "Mumbai", "Maharashtra", 2],
+    ["110001", "New Delhi", "Delhi", 3],
+    ["110019", "New Delhi", "Delhi", 3],
+    ["560001", "Bengaluru", "Karnataka", 3],
+    ["560034", "Bengaluru", "Karnataka", 3],
+    ["600001", "Chennai", "Tamil Nadu", 4],
+    ["500001", "Hyderabad", "Telangana", 4],
+    ["700001", "Kolkata", "West Bengal", 5],
+    ["411001", "Pune", "Maharashtra", 3],
+    ["380001", "Ahmedabad", "Gujarat", 4],
+  ];
+  await Pincode.bulkWrite(
+    pincodes.map(([code, city, state, deliveryDays]) => ({
+      updateOne: {
+        filter: { code },
+        update: { $setOnInsert: { code, city, state, deliveryDays, serviceable: true } },
+        upsert: true,
+      },
+    })),
+    { ordered: true },
+  );
+
+  const couponExpiry = new Date();
+  couponExpiry.setFullYear(couponExpiry.getFullYear() + 1);
+  const seedCoupons = [
+    {
+      code: "WELCOME10",
+      type: "percentage",
+      value: 10,
+      minimumOrderValue: 499,
+      expiresAt: couponExpiry,
+      usageLimit: 500,
+      active: true,
+    },
+    {
+      code: "ALPHA100",
+      type: "flat",
+      value: 100,
+      minimumOrderValue: 999,
+      expiresAt: couponExpiry,
+      usageLimit: 250,
+      active: true,
+    },
+  ];
+  for (const coupon of seedCoupons) {
+    await Coupon.updateOne({ code: coupon.code }, { $setOnInsert: coupon }, { upsert: true });
   }
 
   const bold = await Product.findOne({ slug: "alpha-bold" });

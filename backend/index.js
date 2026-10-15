@@ -27,18 +27,22 @@ app.use("/api", apiRouter);
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   if (error.code === 11000) {
-    return res.status(409).json({ error: "That URL slug is already in use." });
+    return res.status(409).json({ error: "A record with that unique value already exists." });
   }
   if (error.name === "ValidationError" || error.name === "CastError") {
     return res.status(400).json({ error: error.message });
   }
-  console.error(error);
+  const isClientError = Number.isInteger(error.status) && error.status >= 400 && error.status < 500;
+  if (!isClientError) console.error(error);
   res.status(error.status || 500).json({
     error: error.status ? error.message : "An unexpected server error occurred.",
   });
 });
 
 try {
+  if (process.env.NODE_ENV === "production" && (!process.env.AUTH_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET.length < 32)) {
+    throw new Error("Set AUTH_TOKEN_SECRET to a random value of at least 32 characters before production startup.");
+  }
   await connectDatabase();
   await seedDatabase();
   await new Promise((resolve, reject) => {

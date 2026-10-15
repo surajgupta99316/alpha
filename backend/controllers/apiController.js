@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import HttpError from "../utils/HttpError.js";
 import LandingPage from "../models/LandingPage.js";
+import Customer from "../models/Customer.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 
@@ -157,7 +158,17 @@ export async function createOrder(req, res) {
       quantity: 1,
       unitPrice: product.price,
     },
-    customer: { fullName, phone, email, address },
+    customer: {
+      id: (await Customer.findOneAndUpdate(
+        { phone },
+        { $setOnInsert: { phone, fullName, ...(email ? { email } : {}) } },
+        { upsert: true, new: true, runValidators: true },
+      ))._id,
+      fullName,
+      phone,
+      email,
+      address,
+    },
     amount: product.price,
     utm,
   });
