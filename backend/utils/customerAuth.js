@@ -2,7 +2,8 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 import Customer from "../models/Customer.js";
 import HttpError from "./HttpError.js";
 
-const sessionSecret = process.env.AUTH_TOKEN_SECRET || randomBytes(32).toString("hex");
+const sessionSecret =
+  process.env.AUTH_TOKEN_SECRET || randomBytes(32).toString("hex");
 const sessionLifetimeSeconds = 60 * 60 * 24 * 30;
 
 export function hashOtp(code, salt = randomBytes(16).toString("hex")) {
@@ -18,10 +19,12 @@ export function verifyOtpHash(code, storedHash) {
 }
 
 export function createSessionToken(customerId) {
-  const payload = Buffer.from(JSON.stringify({
-    sub: customerId.toString(),
-    exp: Math.floor(Date.now() / 1000) + sessionLifetimeSeconds,
-  })).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      sub: customerId.toString(),
+      exp: Math.floor(Date.now() / 1000) + sessionLifetimeSeconds,
+    }),
+  ).toString("base64url");
   const signature = createHmac("sha256", sessionSecret).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
@@ -30,7 +33,12 @@ export function verifySessionToken(token) {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) throw new HttpError(401, "Please sign in to continue.");
   const expected = createHmac("sha256", sessionSecret).update(payload).digest();
-  const actual = Buffer.from(signature, "base64url");
+  let actual;
+  try {
+    actual = Buffer.from(signature, "base64url");
+  } catch {
+    throw new HttpError(401, "Please sign in to continue.");
+  }
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     throw new HttpError(401, "Please sign in to continue.");
   }
@@ -48,7 +56,8 @@ export function verifySessionToken(token) {
 
 export async function requireCustomer(req, res, next) {
   try {
-    const match = (req.get("authorization") || "").match(/^Bearer (.+)$/i);
+    const authorization = req.get("authorization") || "";
+    const match = authorization.match(/^Bearer ([^\s]+)$/);
     if (!match) throw new HttpError(401, "Please sign in to continue.");
     await loadSessionCustomer(req, match[1]);
     next();
@@ -61,7 +70,7 @@ export async function optionalCustomer(req, res, next) {
   try {
     const authorization = req.get("authorization");
     if (!authorization) return next();
-    const match = authorization.match(/^Bearer (.+)$/i);
+    const match = authorization.match(/^Bearer ([^\s]+)$/);
     if (!match) throw new HttpError(401, "Please sign in again.");
     await loadSessionCustomer(req, match[1]);
     next();

@@ -153,5 +153,5 @@ export async function seedDatabase() {
     { upsert: true },
   );
 
-  console.log("Sample products and the editable Alpha Bold campaign are ready.");
+  console.log("Sample products, serviceable pincodes, coupons, and the editable Alpha Bold campaign are ready.");
 }

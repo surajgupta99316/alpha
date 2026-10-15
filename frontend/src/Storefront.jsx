@@ -8,14 +8,11 @@ const money = (amount) => `₹${Number(amount || 0).toLocaleString("en-IN")}`;
 
 function StoreHeader({ cart, navigate }) {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const link = (path, text, className = "") => (
-    <a className={className} href={path} onClick={(event) => { event.preventDefault(); navigate(path); }}>{text}</a>
-  );
   return (
     <header className="store-header">
-      {link("/", <>ALPHA<span>MALE</span></>, "store-wordmark")}
-      <nav aria-label="Main navigation">{link("/products", "The collection")}{link("/account", "My account")}</nav>
-      {link("/cart", <>Bag <span>{count}</span></>, "store-cart-link")}
+      <a className="store-wordmark" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a>
+      <nav aria-label="Main navigation"><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>The collection</a><a href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>My account</a></nav>
+      <a className="store-cart-link" href="/cart" onClick={(event) => { event.preventDefault(); navigate("/cart"); }}>Bag <span>{count}</span></a>
     </header>
   );
 }
@@ -66,31 +63,23 @@ function StoreHome({ navigate, products, addToCart, error }) {
         <div className="store-home-image"><img src={products[0]?.imageUrl || "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=1200&q=80"} alt="Discover the Alpha Male fragrance collection" fetchpriority="high" /></div>
         <span className="store-home-index">01 — THE COLLECTION / MUMBAI, INDIA</span>
       </section>
-      <section className="store-section store-featured">
-        <div className="store-section-heading"><div><p className="store-eyebrow">THE SIGNATURE EDIT</p><h2>Find your <em>fragrance.</em></h2></div><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>View all products ↗</a></div>
-        {error ? <p className="store-error" role="alert">{error}</p> : <ProductGrid products={products.slice(0, 4)} navigate={navigate} addToCart={addToCart} />}
-      </section>
+      <section className="store-section store-featured"><div className="store-section-heading"><div><p className="store-eyebrow">THE SIGNATURE EDIT</p><h2>Find your <em>fragrance.</em></h2></div><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>View all products ↗</a></div>{error ? <p className="store-error" role="alert">{error}</p> : <ProductGrid products={products.slice(0, 4)} navigate={navigate} addToCart={addToCart} />}</section>
     </>
   );
 }
 
-function ProductListing({ navigate, addToCart }) {
+function ProductListing({ navigate, cart, addToCart }) {
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("featured");
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState(["All"]);
   const [error, setError] = useState("");
-  useEffect(() => {
-    api.getStoreProducts()
-      .then((rows) => setCategories(["All", ...new Set(rows.map((product) => product.category))]))
-      .catch((requestError) => setError(requestError.message));
-  }, []);
   useEffect(() => {
     api.getStoreProducts({ category, sort, search })
       .then((rows) => { setProducts(rows); setError(""); })
       .catch((requestError) => setError(requestError.message));
   }, [category, sort, search]);
+  const categories = ["All", ...new Set(products.map((product) => product.category))];
   return (
     <section className="store-section store-collection">
       <p className="store-eyebrow"><span /> THE COLLECTION</p><h1 className="store-page-title">Find your <em>fragrance.</em></h1>
@@ -135,40 +124,28 @@ function ProductDetail({ slug, navigate, addToCart }) {
   useEffect(() => {
     api.getStoreProduct(slug).then(setProduct).catch((requestError) => setError(requestError.message));
   }, [slug]);
-  if (error) return <div className="store-error-screen"><h1>{error}</h1><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Back to the collection ↗</button></div>;
-  if (!product) return <div className="store-loading">Finding your next signature…</div>;
-  const maxQuantity = Math.max(1, Math.min(10, product.stock));
+  if (error) return <div className="store-error-screen"><h1>{error}</h1><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>Back to the collection ↗</a></div>;
+  if (!product) return <div className="store-loading">Finding your signature…</div>;
+  function add() {
+    addToCart(product, quantity);
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 1800);
+  }
   return (
-    <section className="store-product-detail">
-      <div className="detail-image"><img src={product.imageUrl} alt={product.name} /></div>
-      <div className="detail-copy">
-        <p className="store-eyebrow"><span /> {product.category}</p><h1>{product.name}<br /><em>made yours.</em></h1><p className="detail-description">{product.description}</p>
-        <div className="detail-price"><strong>{money(product.price)}</strong><s>{money(product.mrp)}</s><span>Inclusive of all taxes</span></div>
-        <p className="stock-note">{product.stock > 0 ? "Ready to make its mark." : "Currently out of stock."}</p>
-        <div className="detail-quantity"><span>QUANTITY</span><button aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((current) => current - 1)} type="button">−</button><strong>{quantity}</strong><button aria-label="Increase quantity" disabled={quantity >= maxQuantity} onClick={() => setQuantity((current) => current + 1)} type="button">+</button></div>
-        <button className="store-button store-button-dark detail-add" disabled={!product.stock} onClick={() => { addToCart(product, quantity); setAdded(true); }} type="button">{added ? "Added to your bag ✓" : "Add to bag"} <span>{money(product.price * quantity)} ↗</span></button>
-        <PincodeCheck value={pincode} onChange={setPincode} />
-      </div>
-    </section>
+    <div className="store-detail-page">
+      <div className="store-breadcrumb"><a href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>Home</a><span>/</span><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>Collection</a><span>/</span>{product.name}</div>
+      <section className="store-product-detail">
+        <div className="store-detail-image"><img src={product.imageUrl} alt={product.name} fetchpriority="high" /><span>{product.category}</span></div>
+        <div className="store-detail-copy"><p className="store-eyebrow"><span /> THE ALPHA SIGNATURE</p><h1>{product.name}</h1><p className="store-detail-description">{product.description} A confident fragrance, carefully composed to stay with you through the day.</p><div className="store-detail-price"><strong>{money(product.price)}</strong><s>{money(product.mrp)}</s><span>{Math.round((1 - product.price / product.mrp) * 100)}% OFF</span></div><p className="store-tax-note">Inclusive of all taxes</p><div className="store-quantity"><span>QUANTITY</span><div><button aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((count) => count - 1)} type="button">−</button><strong>{quantity}</strong><button aria-label="Increase quantity" disabled={quantity >= Math.min(10, product.stock)} onClick={() => setQuantity((count) => count + 1)} type="button">+</button></div></div><button className="store-button store-button-dark store-detail-add" disabled={product.stock < 1} onClick={add} type="button">{product.stock < 1 ? "Currently sold out" : added ? "Added to your bag ✓" : "Add to bag"} <span>{money(product.price * quantity)} ↗</span></button><PincodeCheck value={pincode} onChange={setPincode} /><p className="store-stock-note">{product.stock > 0 ? "Thoughtfully made. Ready to ship." : "This fragrance is currently sold out."}</p></div>
+      </section>
+    </div>
   );
 }
 
 function FreeShippingBar({ subtotal }) {
-  const progress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
   const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
-  return <div className="free-shipping"><div>{remaining ? <>You’re {money(remaining)} away from <strong>free shipping.</strong></> : <><strong>You’ve unlocked free shipping.</strong> A good choice.</>}</div><div className="shipping-track"><span style={{ width: `${progress}%` }} /></div></div>;
-}
-
-function FrequentlyBoughtTogether({ cart, addToCart }) {
-  const { products } = useStoreProducts();
-  const recommendations = useMemo(() => {
-    const ids = cart.map((item) => item._id);
-    return products.filter((item) => !ids.includes(item._id)).slice(0, 2);
-  }, [products, cart]);
-  if (!recommendations.length) return null;
-  return (
-    <section className="fbt-section"><div><p className="store-eyebrow">THE PAIRING NOTE</p><h2>Frequently bought <em>together.</em></h2></div><div className="fbt-items">{recommendations.map((product) => <article className="fbt-card" key={product._id}><img src={product.imageUrl} alt="" loading="lazy" /><div><strong>{product.name}</strong><span>{money(product.price)}</span></div><button onClick={() => addToCart(product)} type="button">+ Add</button></article>)}</div></section>
-  );
+  const progress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
+  return <div className="free-shipping"><div><span>{remaining ? <>You’re {money(remaining)} away from free shipping.</> : <>You unlocked <strong>free shipping.</strong> ✳</>}</span><span>{money(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {money(FREE_SHIPPING_THRESHOLD)}</span></div><div className="free-shipping-track"><span style={{ width: `${progress}%` }} /></div></div>;
 }
 
 function CartPage({ cart, setCart, navigate }) {
@@ -180,15 +157,23 @@ function CartPage({ cart, setCart, navigate }) {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = applied?.discount || 0;
   const afterDiscount = subtotal - discount;
-  const shipping = afterDiscount >= FREE_SHIPPING_THRESHOLD ? 0 : 49;
-  const total = afterDiscount + (cart.length ? shipping : 0);
+  const shipping = cart.length && afterDiscount < FREE_SHIPPING_THRESHOLD ? 49 : 0;
   useEffect(() => {
-    api.getCoupons().then(setCoupons).catch((error) => setCouponError(error.message));
+    api.getCoupons().then(setCoupons).catch((error) => console.error("Could not load available coupons.", error));
+    if (couponCode && subtotal > 0) {
+      api.validateCoupon(couponCode, subtotal)
+        .then(setApplied)
+        .catch(() => { setApplied(null); window.localStorage.removeItem(COUPON_KEY); });
+    }
   }, []);
+  useEffect(() => {
+    if (!applied) return;
+    api.validateCoupon(applied.code, subtotal)
+      .then(setApplied)
+      .catch(() => { setApplied(null); setCouponError("This coupon no longer applies to your cart."); window.localStorage.removeItem(COUPON_KEY); });
+  }, [subtotal]);
   function changeQuantity(id, delta) {
-    setCart((items) => items.map((item) => item._id === id
-      ? { ...item, quantity: Math.max(1, Math.min(Math.min(10, item.stock), item.quantity + delta)) }
-      : item));
+    setCart((items) => items.map((item) => item._id === id ? { ...item, quantity: Math.max(1, Math.min(Math.min(10, item.stock), item.quantity + delta)) } : item));
   }
   async function applyCoupon(event) {
     event.preventDefault();
@@ -206,28 +191,31 @@ function CartPage({ cart, setCart, navigate }) {
       setBusy(false);
     }
   }
-  function addRecommended(product) {
-    setCart((items) => {
-      const existing = items.find((item) => item._id === product._id);
-      return existing
-        ? items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(Math.min(10, item.stock), item.quantity + 1) } : item)
-        : [...items, { ...product, quantity: 1 }];
-    });
-  }
-  if (!cart.length) return <section className="store-empty-page"><span className="empty-bag-icon">✳</span><h1>Your bag is<br /><em>taking a break.</em></h1><p>Add a fragrance to your bag before checking out.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection <span>↗</span></button></section>;
+  if (!cart.length) return <section className="store-empty-page"><p className="store-eyebrow">YOUR BAG / 00</p><span className="empty-bag-icon">✳</span><h1>Your next signature<br /><em>is waiting.</em></h1><p>Your bag is taking a quiet moment. Let’s find something that feels like you.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection <span>↗</span></button></section>;
+  const total = afterDiscount + shipping;
+  const recommendations = cart[0]._id;
   return (
     <section className="store-section cart-page">
-      <p className="store-eyebrow"><span /> YOUR SELECTION</p><h1 className="store-page-title">The good <em>stuff.</em></h1>
+      <p className="store-eyebrow"><span /> YOUR BAG / {String(cart.reduce((sum, item) => sum + item.quantity, 0)).padStart(2, "0")}</p><h1 className="store-page-title">A good choice.</h1>
       <div className="cart-layout">
-        <div className="cart-items-column">
-          <FreeShippingBar subtotal={afterDiscount} />
-          <div className="cart-items">{cart.map((item) => <article className="cart-item" key={item._id}><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><img src={item.imageUrl} alt={item.name} /></a><div className="cart-item-details"><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><h2>{item.name}</h2></a><span>{item.category}</span><div className="cart-item-quantity"><button aria-label={`Decrease ${item.name} quantity`} disabled={item.quantity <= 1} onClick={() => changeQuantity(item._id, -1)} type="button">−</button><span>{item.quantity}</span><button aria-label={`Increase ${item.name} quantity`} disabled={item.quantity >= Math.min(10, item.stock)} onClick={() => changeQuantity(item._id, 1)} type="button">+</button></div></div><div className="cart-item-price"><strong>{money(item.price * item.quantity)}</strong><s>{money(item.mrp * item.quantity)}</s><button onClick={() => setCart((items) => items.filter((row) => row._id !== item._id))} type="button">Remove</button></div></article>)}</div>
-          <FrequentlyBoughtTogether cart={cart} addToCart={addRecommended} />
+        <div className="cart-items-column"><FreeShippingBar subtotal={afterDiscount} /><div className="cart-items">{cart.map((item) => <article className="cart-item" key={item._id}><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><img src={item.imageUrl} alt={item.name} /></a><div className="cart-item-details"><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><h2>{item.name}</h2></a><span>{item.category}</span><div className="cart-item-quantity"><button aria-label={`Decrease ${item.name} quantity`} disabled={item.quantity <= 1} onClick={() => changeQuantity(item._id, -1)} type="button">−</button><span>{item.quantity}</span><button aria-label={`Increase ${item.name} quantity`} disabled={item.quantity >= Math.min(10, item.stock)} onClick={() => changeQuantity(item._id, 1)} type="button">+</button></div></div><div className="cart-item-price"><strong>{money(item.price * item.quantity)}</strong><s>{money(item.mrp * item.quantity)}</s><button onClick={() => setCart((items) => items.filter((row) => row._id !== item._id))} type="button">Remove</button></div></article>)}</div>
+          <FrequentlyBoughtTogether products={cart} currentId={recommendations} addToCart={(product) => setCart((items) => { const existing = items.find((item) => item._id === product._id); return existing ? items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(10, item.quantity + 1) } : item) : [...items, { ...product, quantity: 1 }]; })} />
         </div>
         <aside className="cart-summary"><p className="store-eyebrow">ORDER SUMMARY</p><h2>The good stuff.</h2><div className="cart-summary-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>{applied && <div className="cart-summary-line cart-discount"><span>Coupon · {applied.code}</span><span>−{money(discount)}</span></div>}<div className="cart-summary-line"><span>Shipping</span><span>{shipping ? money(shipping) : "FREE"}</span></div><div className="coupon-form-wrap"><label htmlFor="coupon-code">HAVE A CODE?</label><form className="coupon-form" onSubmit={applyCoupon}><input id="coupon-code" maxLength="30" onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Enter code" value={couponCode} /><button disabled={busy || !subtotal} type="submit">{busy ? "…" : applied ? "Applied ✓" : "Apply"}</button></form>{couponError && <p className="coupon-error" role="alert">{couponError}</p>}<div className="available-coupons">{coupons.filter((coupon) => subtotal >= coupon.minimumOrderValue).map((coupon) => <button key={coupon.code} onClick={() => setCouponCode(coupon.code)} type="button">{coupon.code} · {coupon.type === "percentage" ? `${coupon.value}% off` : `${money(coupon.value)} off`}</button>)}</div></div><div className="cart-summary-total"><strong>Total</strong><strong>{money(total)}</strong></div><p className="cart-tax-note">Tax included. Shipping calculated above.</p><button className="store-button store-button-dark checkout-button" onClick={() => navigate("/checkout")} type="button">Continue to checkout <span>↗</span></button><a className="keep-shopping" href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>Keep exploring ↗</a><p className="payment-note">Secure checkout · Guest checkout available</p></aside>
       </div>
     </section>
   );
+}
+
+function FrequentlyBoughtTogether({ products, currentId, addToCart }) {
+  const { products: allProducts } = useStoreProducts();
+  const recommendations = useMemo(() => {
+    const ids = products.map((item) => item._id);
+    const next = allProducts.filter((item) => !ids.includes(item._id)).slice(0, 2);
+    return next;
+  }, [allProducts, products, currentId]);
+  if (!recommendations.length) return null;
+  return <section className="fbt-section"><div><p className="store-eyebrow">THE PAIRING NOTE</p><h2>Frequently bought <em>together.</em></h2></div><div className="fbt-items">{recommendations.map((product) => <article className="fbt-card" key={product._id}><img src={product.imageUrl} alt="" loading="lazy" /><div><strong>{product.name}</strong><span>{money(product.price)}</span></div><button onClick={() => addToCart(product)} type="button">+ Add</button></article>)}</div></section>;
 }
 
 function CheckoutPage({ cart, setCart, navigate }) {
@@ -242,6 +230,7 @@ function CheckoutPage({ cart, setCart, navigate }) {
   const discount = coupon?.discount || 0;
   const shipping = subtotal - discount >= FREE_SHIPPING_THRESHOLD ? 0 : 49;
   const total = subtotal - discount + (cart.length ? shipping : 0);
+
   useEffect(() => {
     if (couponCode && subtotal) api.validateCoupon(couponCode, subtotal).then(setCoupon).catch(() => setCoupon(null));
   }, [couponCode, subtotal]);
@@ -268,15 +257,18 @@ function CheckoutPage({ cart, setCart, navigate }) {
         .then((result) => {
           if (!active) return;
           setPincodeResult(result);
-          setForm((current) => ({ ...current, city: result.serviceable ? result.city : "", state: result.serviceable ? result.state : "" }));
+          if (result.serviceable) {
+            setForm((current) => ({ ...current, city: result.city, state: result.state }));
+          } else {
+            setForm((current) => ({ ...current, city: "", state: "" }));
+          }
         })
         .catch((requestError) => { if (active) setPincodeResult({ serviceable: false, message: requestError.message }); });
     }, 250);
     return () => { active = false; window.clearTimeout(timer); };
   }, [form.pincode]);
   function update(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: name === "phone" || name === "pincode" ? value.replace(/\D/g, "").slice(0, name === "phone" ? 10 : 6) : value }));
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
   async function submit(event) {
     event.preventDefault();
@@ -307,78 +299,92 @@ function CheckoutPage({ cart, setCart, navigate }) {
   }
   if (!cart.length) return <section className="store-empty-page"><span className="empty-bag-icon">✳</span><h1>Your bag is<br /><em>taking a break.</em></h1><p>Add a fragrance to your bag before checking out.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection <span>↗</span></button></section>;
   return (
-    <section className="store-section checkout-page"><p className="store-eyebrow"><span /> SECURE CHECKOUT</p><h1 className="store-page-title">Almost <em>yours.</em></h1><div className="checkout-layout"><form className="checkout-form" onSubmit={submit}><h2>Delivery details</h2><label>Full name<input autoComplete="name" maxLength="100" name="fullName" onChange={update} required value={form.fullName} /></label><div className="checkout-row"><label>Mobile number<input autoComplete="tel" inputMode="numeric" maxLength="10" name="phone" onChange={update} pattern="[0-9]{10}" required value={form.phone} /></label><label>Email <span className="optional-label">OPTIONAL</span><input autoComplete="email" maxLength="254" name="email" onChange={update} type="email" value={form.email} /></label></div><label>Delivery address<textarea autoComplete="street-address" maxLength="500" name="address" onChange={update} required rows="3" value={form.address} /></label><label>Pincode<input autoComplete="postal-code" inputMode="numeric" maxLength="6" name="pincode" onChange={update} pattern="[0-9]{6}" required value={form.pincode} /></label>{pincodeResult && <p className={pincodeResult.serviceable ? "pincode-success" : "pincode-error"} role="status">{pincodeResult.message}{pincodeResult.serviceable && ` · ${form.city}, ${form.state}`}</p>}{error && <p className="store-error" role="alert">{error}</p>}<button className="store-button store-button-dark checkout-button" disabled={submitting} type="submit">{submitting ? "Saving your order…" : "Place order"} <span>↗</span></button><p className="payment-note">No payment is collected now. Payment options will be available in Module 3.</p></form><aside className="checkout-summary"><p className="store-eyebrow">YOUR ORDER</p>{cart.map((item) => <div className="checkout-line" key={item._id}><span>{item.name} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<div className="checkout-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>{discount > 0 && <div className="checkout-line cart-discount"><span>Discount · {coupon.code}</span><span>−{money(discount)}</span></div>}<div className="checkout-line"><span>Shipping</span><span>{shipping ? money(shipping) : "FREE"}</span></div><div className="checkout-total"><strong>Total</strong><strong>{money(total)}</strong></div></aside></div></section>
+    <section className="store-section checkout-page"><div className="store-breadcrumb"><a href="/cart" onClick={(event) => { event.preventDefault(); navigate("/cart"); }}>Your bag</a><span>/</span>Checkout</div><div className="checkout-layout"><div><p className="store-eyebrow"><span /> ONE LAST STEP</p><h1 className="store-page-title">Make it <em>yours.</em></h1><p className="checkout-lede">Delivery details, then we’ll take it from here.</p><form className="checkout-form" onSubmit={submit}><div className="checkout-form-heading"><span>01</span><div><strong>Who’s receiving it?</strong><small>Guest checkout is ready. No account required.</small></div><a href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>{token ? "Account ↗" : "Sign in ↗"}</a></div><label>Full name<input autoComplete="name" maxLength="100" name="fullName" onChange={update} required value={form.fullName} placeholder="Your name" /></label><div className="checkout-fields-row"><label>Mobile number<input autoComplete="tel" inputMode="numeric" maxLength="10" name="phone" onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value.replace(/\D/g, "").slice(0, 10) }))} pattern="[0-9]{10}" required value={form.phone} placeholder="10-digit number" /></label><label>Email <span className="store-optional">OPTIONAL</span><input autoComplete="email" maxLength="254" name="email" onChange={update} type="email" value={form.email} placeholder="you@example.com" /></label></div><label>Street address<textarea autoComplete="street-address" maxLength="500" name="address" onChange={update} required rows="3" value={form.address} placeholder="Flat, house number, street, area" /></label><label>Pincode<input autoComplete="postal-code" inputMode="numeric" maxLength="6" name="pincode" onChange={(event) => setForm((current) => ({ ...current, pincode: event.target.value.replace(/\D/g, "").slice(0, 6) }))} pattern="[0-9]{6}" required value={form.pincode} placeholder="6-digit pincode" /></label>{pincodeResult && <p className={pincodeResult.serviceable ? "pincode-success" : "pincode-error"} role="status">{pincodeResult.message}</p>}<div className="checkout-fields-row"><label>City<input name="city" readOnly required value={form.city} placeholder="Auto-filled from pincode" /></label><label>State<input name="state" readOnly required value={form.state} placeholder="Auto-filled from pincode" /></label></div>{error && <p className="store-error" role="alert">{error}</p>}<button className="store-button store-button-dark checkout-place-order" disabled={submitting || !pincodeResult?.serviceable} type="submit">{submitting ? "Saving your checkout…" : "Place order request"} <span>↗</span></button><p className="checkout-disclaimer">This creates a checkout order request. Online payment will be added in Module 3.</p></form></div><aside className="checkout-summary"><p className="store-eyebrow">YOUR SELECTION</p><h2>A signature edit.</h2>{cart.map((item) => <div className="checkout-summary-item" key={item._id}><img src={item.imageUrl} alt="" /><div><strong>{item.name}</strong><span>Qty {item.quantity} · {money(item.price)} each</span></div><strong>{money(item.price * item.quantity)}</strong></div>)}<FreeShippingBar subtotal={subtotal - discount} /><div className="cart-summary-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>{coupon && <div className="cart-summary-line cart-discount"><span>Coupon · {coupon.code}</span><span>−{money(discount)}</span></div>}<div className="cart-summary-line"><span>Shipping</span><span>{shipping ? money(shipping) : "FREE"}</span></div><div className="cart-summary-total"><strong>Total</strong><strong>{money(total)}</strong></div><p className="payment-note">All prices in Indian rupees. No payment is collected yet.</p></aside></div></section>
   );
 }
 
-function CheckoutSuccess({ orderNumber, navigate }) {
-  return <section className="store-empty-page checkout-success"><span className="empty-bag-icon">✓</span><p className="store-eyebrow">ORDER REQUEST RECEIVED</p><h1>We’ll take it<br /><em>from here.</em></h1><p>Your reference is <strong>{orderNumber}</strong>.</p><p className="payment-note">Your order is saved. Payment will be available in Module 3.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Back to the collection ↗</button></section>;
-}
-
-function LoginAndAccount() {
+function LoginAndAccount({ navigate }) {
   const [token, setToken] = useState(() => window.localStorage.getItem(AUTH_KEY) || "");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!token) return;
     Promise.all([api.getMyAccount(token), api.getMyOrders(token)])
       .then(([account, history]) => { setCustomer(account.customer); setOrders(history); })
-      .catch((requestError) => { window.localStorage.removeItem(AUTH_KEY); setToken(""); setError(requestError.message); });
+      .catch((requestError) => {
+        setError(requestError.message);
+        window.localStorage.removeItem(AUTH_KEY);
+        setToken("");
+      });
   }, [token]);
   async function requestCode(event) {
     event.preventDefault();
-    setBusy(true); setError(""); setMessage("");
-    try { const result = await api.requestOtp(phone); setRequested(true); setMessage(result.message); }
-    catch (requestError) { setError(requestError.message); }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await api.requestOtp(phone);
+      setRequested(true);
+      setNotice(result.message);
+    } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   }
   async function verifyCode(event) {
     event.preventDefault();
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setError("");
     try {
       const result = await api.verifyOtp(phone, code);
       window.localStorage.setItem(AUTH_KEY, result.token);
-      setToken(result.token);
       setCustomer(result.customer);
+      setToken(result.token);
+      setRequested(false);
+      setNotice("You’re signed in.");
     } catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   }
   function signOut() {
     window.localStorage.removeItem(AUTH_KEY);
-    setToken(""); setCustomer(null); setOrders([]); setRequested(false);
+    setToken(""); setCustomer(null); setOrders([]); setCode(""); setRequested(false); setNotice("You’ve signed out.");
   }
-  if (token && customer) return (
-    <section className="store-section account-page"><p className="store-eyebrow"><span /> YOUR ALPHA ACCOUNT</p><h1 className="store-page-title">Good to see you, <em>{customer.fullName || customer.phone}.</em></h1><button className="account-signout" onClick={signOut} type="button">Sign out</button><h2>Your orders</h2>{orders.length ? <div className="account-orders">{orders.map((order) => <article key={order._id}><div><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString("en-IN")}</span></div><strong>{money(order.amount)}</strong><span className="order-status">{order.status}</span></article>)}</div> : <p className="store-muted">Your orders will appear here after checkout.</p>}</section>
-  );
   return (
-    <section className="account-login"><p className="store-eyebrow"><span /> THE ALPHA ACCOUNT</p><h1>Good things<br /><em>start here.</em></h1><p>Sign in with your mobile number to see your order history.</p>{!requested ? <form className="account-form" onSubmit={requestCode}><label>Mobile number<input autoComplete="tel" inputMode="numeric" maxLength="10" onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} pattern="[0-9]{10}" required value={phone} /></label><button className="store-button store-button-dark" disabled={busy} type="submit">{busy ? "Sending…" : "Send verification code"} ↗</button></form> : <form className="account-form" onSubmit={verifyCode}><p>{message}</p><label>6-digit verification code<input autoComplete="one-time-code" inputMode="numeric" maxLength="6" onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} pattern="[0-9]{6}" required value={code} /></label><button className="store-button store-button-dark" disabled={busy} type="submit">{busy ? "Verifying…" : "Verify and sign in"} ↗</button></form>}{error && <p className="store-error" role="alert">{error}</p>}</section>
+    <section className="store-section account-page"><p className="store-eyebrow"><span /> YOUR ALPHA ACCOUNT</p><h1 className="store-page-title">The story so <em>far.</em></h1>{error && <p className="store-error" role="alert">{error}</p>}{notice && <p className="account-notice" role="status">{notice}</p>}{customer ? <><div className="account-welcome"><div><span>GOOD TO HAVE YOU BACK</span><h2>{customer.fullName || customer.phone}</h2></div><button className="store-button store-button-outline" onClick={signOut} type="button">Sign out</button></div><h2 className="account-orders-title">Your orders <span>{orders.length}</span></h2>{orders.length ? <div className="account-order-list">{orders.map((order) => <article className="account-order-card" key={order._id}><div className="account-order-top"><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span><span className="account-order-status">{order.status}</span></div>{(order.items?.length ? order.items : order.product ? [{ ...order.product, lineTotal: order.amount }] : []).map((item, index) => <div className="account-order-item" key={`${order._id}-${index}`}><span>{item.name} × {item.quantity}</span><strong>{money(item.lineTotal ?? item.unitPrice * item.quantity)}</strong></div>)}<div className="account-order-total"><span>Order total</span><strong>{money(order.amount)}</strong></div></article>)}</div> : <div className="account-no-orders"><p>Your order story starts with one good choice.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection ↗</button></div>}</> : <div className="account-login-layout"><div className="account-login-note"><span>✳</span><h2>Your orders,<br /><em>all in one place.</em></h2><p>Sign in with your mobile number to see your order history. No password, no fuss.</p></div><form className="account-login-card" onSubmit={requested ? verifyCode : requestCode}><p className="store-eyebrow">{requested ? "02 / VERIFY IT’S YOU" : "01 / YOUR MOBILE NUMBER"}</p><h2>{requested ? "One little code." : "Welcome back."}</h2><label>Mobile number<input autoComplete="tel" disabled={requested} inputMode="numeric" maxLength="10" onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} pattern="[0-9]{10}" required value={phone} placeholder="10-digit number" /></label>{requested && <label>6-digit verification code<input autoComplete="one-time-code" inputMode="numeric" maxLength="6" onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} pattern="[0-9]{6}" required value={code} placeholder="Check backend terminal in local development" /></label>}{error && <p className="form-error" role="alert">{error}</p>}<button className="store-button store-button-dark" disabled={busy} type="submit">{busy ? "Just a moment…" : requested ? "Verify & sign in" : "Send one-time code"} <span>↗</span></button>{requested && <button className="account-change-number" onClick={() => { setRequested(false); setCode(""); setError(""); }} type="button">Change mobile number</button>}<p className="account-privacy">One-time codes expire in 5 minutes and can only be used once.</p></form></div>}</section>
   );
+}
+
+function CheckoutSuccess({ orderNumber, navigate }) {
+  return <section className="store-empty-page checkout-success"><span className="empty-bag-icon">✓</span><p className="store-eyebrow">CHECKOUT SAVED</p><h1>Your next signature<br /><em>is on its way.</em></h1><p>Order request <strong>{orderNumber}</strong> has been saved. Online payment will be available in Module 3.</p><button className="store-button store-button-dark" onClick={() => navigate("/account")} type="button">View your account <span>↗</span></button></section>;
 }
 
 export default function Storefront({ path, cart, setCart, navigate }) {
   const { products, error } = useStoreProducts();
-  const addToCart = (product, quantity) => {
+  function addToCart(product, quantity = 1) {
     setCart((items) => {
-      const existing = items.find((item) => item._id === product._id);
-      return existing
-        ? items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(Math.min(10, item.stock), item.quantity + quantity) } : item)
-        : [...items, { ...product, quantity: Math.min(Math.min(10, product.stock), quantity) }];
+      const current = items.find((item) => item._id === product._id);
+      if (current) return items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(Math.min(10, product.stock), item.quantity + quantity) } : item);
+      return [...items, { ...product, quantity: Math.min(Math.min(10, product.stock), quantity) }];
     });
-  };
-  let page;
-  if (path === "/") page = <StoreHome navigate={navigate} products={products} addToCart={addToCart} error={error} />;
-  else if (path === "/products") page = <ProductListing navigate={navigate} addToCart={addToCart} />;
-  else if (path === "/cart") page = <CartPage cart={cart} setCart={setCart} navigate={navigate} />;
-  else if (path === "/checkout") page = <CheckoutPage cart={cart} setCart={setCart} navigate={navigate} />;
-  else if (path.startsWith("/checkout/success/")) page = <CheckoutSuccess orderNumber={decodeURIComponent(path.slice("/checkout/success/".length))} navigate={navigate} />;
-  else if (path === "/account") page = <LoginAndAccount />;
-  else if (path.startsWith("/products/")) page = <ProductDetail slug={decodeURIComponent(path.slice("/products/".length))} navigate={navigate} addToCart={addToCart} />;
-  else page = <div className="store-error-screen"><h1>We couldn’t find that page.</h1><button className="store-button store-button-dark" onClick={() => navigate("/")} type="button">Back to home ↗</button></div>;
-  return <div className="store-shell"><StoreHeader cart={cart} navigate={navigate} /><main>{page}</main><footer className="store-footer"><a href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a><span>MUMBAI, INDIA · MADE FOR YOUR NEXT MOVE</span><span>© ALPHA MALE</span></footer></div>;
+  }
+  const successMatch = path.match(/^\/checkout\/success\/([^/]+)$/);
+  const productMatch = path.match(/^\/products\/([^/]+)$/);
+  let content;
+  if (successMatch) {
+    content = <CheckoutSuccess orderNumber={decodeURIComponent(successMatch[1])} navigate={navigate} />;
+  } else if (path === "/cart") {
+    content = <CartPage cart={cart} setCart={setCart} navigate={navigate} />;
+  } else if (path === "/checkout") {
+    content = <CheckoutPage cart={cart} setCart={setCart} navigate={navigate} />;
+  } else if (path === "/account") {
+    content = <LoginAndAccount navigate={navigate} />;
+  } else if (productMatch) {
+    content = <ProductDetail slug={decodeURIComponent(productMatch[1])} navigate={navigate} addToCart={addToCart} />;
+  } else if (path === "/products") {
+    content = <ProductListing navigate={navigate} cart={cart} addToCart={addToCart} />;
+  } else {
+    content = <StoreHome navigate={navigate} products={products} addToCart={addToCart} error={error} />;
+  }
+  return <main className="storefront"><StoreHeader cart={cart} navigate={navigate} />{content}<footer className="store-footer"><a className="store-wordmark" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a><span>MUMBAI, INDIA · MADE FOR YOUR NEXT MOVE</span><a href="mailto:info@alphamale.co.in">GET IN TOUCH ↗</a></footer></main>;
 }

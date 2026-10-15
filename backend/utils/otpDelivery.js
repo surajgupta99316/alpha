@@ -6,10 +6,15 @@ function twilioConfiguration() {
   const phoneNumber = process.env.TWILIO_PHONE_NUMBER?.trim();
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
   const configured = [accountSid, authToken, phoneNumber, messagingServiceSid].some(Boolean);
+
   if (!configured) return null;
   if (!accountSid || !authToken || (!phoneNumber && !messagingServiceSid)) {
-    throw new HttpError(503, "Twilio OTP configuration is incomplete. Set the account SID, auth token, and a phone number or messaging service SID.");
+    throw new HttpError(
+      503,
+      "Twilio OTP configuration is incomplete. Set the account SID, auth token, and a phone number or messaging service SID.",
+    );
   }
+
   return { accountSid, authToken, phoneNumber, messagingServiceSid };
 }
 
@@ -26,8 +31,11 @@ export async function deliverOtp(phone, code) {
     To: `+91${phone}`,
     Body: `Your Alpha Male verification code is ${code}. It expires in 5 minutes.`,
   });
-  if (config.messagingServiceSid) body.set("MessagingServiceSid", config.messagingServiceSid);
-  else body.set("From", config.phoneNumber);
+  if (config.messagingServiceSid) {
+    body.set("MessagingServiceSid", config.messagingServiceSid);
+  } else {
+    body.set("From", config.phoneNumber);
+  }
 
   let response;
   try {
@@ -46,19 +54,24 @@ export async function deliverOtp(phone, code) {
   } catch {
     throw new HttpError(502, "Twilio could not be reached. Check the server connection and try again.");
   }
+
   if (!response.ok) {
     let details = {};
     try {
       details = await response.json();
     } catch {
-      // Twilio can return a non-JSON error response.
+      // Twilio may return a non-JSON error response.
     }
     console.error("Twilio rejected the OTP message.", {
       status: response.status,
       code: details.code,
       message: details.message,
     });
-    throw new HttpError(502, "Twilio could not send the verification code. Check the configuration and verify the recipient on a trial account.");
+    throw new HttpError(
+      502,
+      "Twilio could not send the verification code. Check the Twilio configuration and ensure the recipient is verified on a trial account.",
+    );
   }
+
   return "sms";
 }

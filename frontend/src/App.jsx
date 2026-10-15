@@ -36,11 +36,15 @@ export default function App() {
   const [path, navigate] = usePath();
   const [cart, setCart] = useState(() => {
     try {
-      const stored = JSON.parse(window.localStorage.getItem("alpha:cart") || "[]");
-      return Array.isArray(stored) ? stored.filter((item) =>
-        item && typeof item._id === "string" && Number.isSafeInteger(item.quantity) && item.quantity > 0
-      ) : [];
-    } catch {
+      const saved = JSON.parse(window.localStorage.getItem("alpha:cart") || "[]");
+      return Array.isArray(saved) ? saved : [];
+    } catch (error) {
+      console.warn("Saved cart data was invalid and has been cleared.", error);
+      try {
+        window.localStorage.removeItem("alpha:cart");
+      } catch (storageError) {
+        console.warn("Could not clear invalid cart data from this browser.", storageError);
+      }
       return [];
     }
   });
@@ -384,7 +388,10 @@ function Admin({ navigate }) {
       <header className="admin-header">
         <a className="wordmark" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a>
         <div className="admin-title"><span>CAMPAIGN STUDIO</span><strong>Module 01 · Acquire</strong></div>
-        <a className="admin-preview-link" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>View storefront ↗</a>
+        <div className="admin-header-links">
+          <a className="admin-preview-link" href="/admin/coupons" onClick={(event) => { event.preventDefault(); navigate("/admin/coupons"); }}>Coupons</a>
+          <a className="admin-preview-link" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>View storefront ↗</a>
+        </div>
       </header>
       <div className="admin-content">
         <div className="admin-heading">

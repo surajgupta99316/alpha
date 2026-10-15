@@ -200,6 +200,7 @@ img { display: block; max-width: 100%; }
 .admin-title span { color: #aaa99f; font-size: 8px; letter-spacing: .15em; }
 .admin-title strong { font-size: 11px; font-weight: 500; }
 .admin-preview-link { font-size: 10px; }
+.admin-header-links { display: flex; align-items: center; gap: 18px; }
 .admin-content { max-width: 1440px; margin: auto; padding: 68px 6.1vw 90px; }
 .admin-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; }
 .admin-heading h1 { margin: 16px 0 0; font-size: clamp(40px, 5vw, 63px); line-height: 1.05; }
@@ -323,6 +324,7 @@ img { display: block; max-width: 100%; }
   .admin-title span { font-size: 6px; }
   .admin-title strong { font-size: 9px; }
   .admin-preview-link { font-size: 8px; }
+  .admin-header-links { gap: 9px; }
   .admin-content { padding: 40px 17px 60px; }
   .admin-heading { align-items: flex-start; flex-direction: column; gap: 20px; }
   .admin-heading h1 { font-size: 44px; }

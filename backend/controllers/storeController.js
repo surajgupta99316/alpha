@@ -83,7 +83,8 @@ export async function getStoreProducts(req, res) {
       : sortBy === "name"
         ? { name: 1 }
         : { createdAt: 1 };
-  res.json(await Product.find(filter).sort(sort).lean());
+  const products = await Product.find(filter).sort(sort).lean();
+  res.json(products);
 }
 
 export async function getStoreProduct(req, res) {
@@ -95,16 +96,22 @@ export async function getStoreProduct(req, res) {
 export async function checkPincode(req, res) {
   const code = validPincode(req.params.code);
   const pincode = await Pincode.findOne({ code }).lean();
-  if (!pincode || !pincode.serviceable) {
-    return res.json({ serviceable: false, pincode: code, message: "Delivery is not available for this pincode yet." });
+  if (!pincode) {
+    return res.json({
+      serviceable: false,
+      pincode: code,
+      message: "Delivery is not available for this pincode yet.",
+    });
   }
   res.json({
-    serviceable: true,
+    serviceable: pincode.serviceable,
     pincode: pincode.code,
     city: pincode.city,
     state: pincode.state,
     deliveryDays: pincode.deliveryDays,
-    message: deliveryEstimate(pincode.deliveryDays),
+    message: pincode.serviceable
+      ? deliveryEstimate(pincode.deliveryDays)
+      : "Delivery is not available for this pincode yet.",
   });
 }
 
@@ -128,6 +135,9 @@ export async function validateCoupon(req, res) {
 }
 
 export async function requestLoginOtp(req, res) {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(503).json({ error: "Mobile OTP delivery is not configured for this deployment." });
+  }
   const phone = validPhone(req.body?.phone);
   const now = new Date();
   const prior = await OtpChallenge.findOne({ phone });
@@ -172,9 +182,13 @@ export async function verifyLoginOtp(req, res) {
   });
   if (!challenge) throw new HttpError(400, "The code expired or is unavailable. Request a new code.");
   if (!verifyOtpHash(code, challenge.codeHash)) {
-    await OtpChallenge.updateOne({ _id: challenge._id, attempts: { $lt: 5 } }, { $inc: { attempts: 1 } });
+    await OtpChallenge.updateOne(
+      { _id: challenge._id, attempts: { $lt: 5 } },
+      { $inc: { attempts: 1 } },
+    );
     throw new HttpError(400, "That code is incorrect.");
   }
+
   const consumed = await OtpChallenge.findOneAndDelete({
     _id: challenge._id,
     codeHash: challenge.codeHash,
@@ -182,6 +196,7 @@ export async function verifyLoginOtp(req, res) {
     attempts: { $lt: 5 },
   });
   if (!consumed) throw new HttpError(400, "The code was already used or expired. Request a new code.");
+
   const customer = await Customer.findOneAndUpdate(
     { phone },
     { $set: { lastLoginAt: new Date() }, $setOnInsert: { phone } },
@@ -208,30 +223,50 @@ export async function createCheckoutOrder(req, res) {
   const checkoutToken = cleanText(body.checkoutToken, "Checkout token", 80, true);
   const previousOrder = await Order.findOne({ checkoutToken }).select("orderNumber subtotal discount shipping amount");
   if (previousOrder) {
-    return res.json({ ...previousOrder.toObject(), reused: true });
+    return res.status(200).json({
+      orderNumber: previousOrder.orderNumber,
+      subtotal: previousOrder.subtotal,
+      discount: previousOrder.discount,
+      shipping: previousOrder.shipping,
+      amount: previousOrder.amount,
+      reused: true,
+    });
   }
-  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 10) {
-    throw new HttpError(400, "Your cart must contain between 1 and 10 product lines.");
+  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 20) {
+    throw new HttpError(400, "Your cart must contain between 1 and 20 products.");
   }
-  const inputItems = body.items.map((item) => {
+
+  const itemQuantities = new Map();
+  for (const item of body.items) {
     if (!mongoose.isValidObjectId(item?.productId)) throw new HttpError(400, "A cart product is invalid.");
-    const quantity = Number(item.quantity);
-    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10) {
-      throw new HttpError(400, "Product quantity must be between 1 and 10.");
+    if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 10) {
+      throw new HttpError(400, "Each product quantity must be between 1 and 10.");
     }
-    return { productId: item.productId, quantity };
-  });
-  const ids = [...new Set(inputItems.map((item) => item.productId))];
-  if (ids.length !== inputItems.length) throw new HttpError(400, "Remove duplicate product lines from your cart.");
-  const products = await Product.find({ _id: { $in: ids }, active: true }).lean();
-  if (products.length !== ids.length) throw new HttpError(400, "One or more products are no longer available.");
-  const productById = new Map(products.map((product) => [product._id.toString(), product]));
-  const items = inputItems.map(({ productId, quantity }) => {
-    const product = productById.get(productId);
+    const key = item.productId.toString();
+    itemQuantities.set(key, (itemQuantities.get(key) || 0) + item.quantity);
+  }
+  if ([...itemQuantities.values()].some((quantity) => quantity > 10)) {
+    throw new HttpError(400, "Maximum quantity per product is 10.");
+  }
+
+  const productIds = [...itemQuantities.keys()];
+  const products = await Product.find({ _id: { $in: productIds }, active: true }).lean();
+  if (products.length !== productIds.length) throw new HttpError(400, "A cart product is no longer available.");
+  const items = products.map((product) => {
+    const quantity = itemQuantities.get(product._id.toString());
     if (quantity > product.stock) throw new HttpError(400, `${product.name} does not have enough stock.`);
-    return { product: product._id, name: product.name, quantity, unitPrice: product.price };
+    return {
+      product: product._id,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      quantity,
+      unitPrice: product.price,
+      lineTotal: product.price * quantity,
+    };
   });
-  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  if (!Number.isSafeInteger(subtotal)) throw new HttpError(400, "Cart total is invalid.");
+
   const fullName = cleanText(body.fullName, "Full name", 100, true);
   const phone = validPhone(body.phone);
   const email = cleanText(body.email, "Email", 254);
@@ -239,11 +274,13 @@ export async function createCheckoutOrder(req, res) {
   const address = cleanText(body.address, "Delivery address", 500, true);
   const pincodeCode = validPincode(body.pincode);
   const pincode = await Pincode.findOne({ code: pincodeCode, serviceable: true }).lean();
-  if (!pincode) throw new HttpError(400, "Delivery is not available for this pincode.");
+  if (!pincode) throw new HttpError(400, "This pincode is not serviceable.");
 
   let customer;
   if (req.customer) {
-    if (req.customer.phone !== phone) throw new HttpError(400, "Use the mobile number linked to your signed-in account.");
+    if (req.customer.phone !== phone) {
+      throw new HttpError(400, "Use the mobile number associated with your signed-in account.");
+    }
     customer = await Customer.findByIdAndUpdate(
       req.customer._id,
       { $set: { fullName, ...(email ? { email } : {}) } },
@@ -258,25 +295,32 @@ export async function createCheckoutOrder(req, res) {
     );
   }
 
-  const code = cleanText(body.couponCode, "Coupon code", 30).toUpperCase();
-  let coupon;
   let discount = 0;
-  if (code) {
-    const candidate = await Coupon.findOne({ code, active: true }).lean();
-    if (!candidate) throw new HttpError(400, "This coupon is invalid or unavailable.");
-    discount = priceForCoupon(candidate, subtotal);
-    coupon = await Coupon.findOneAndUpdate(
+  let coupon;
+  const couponCode = cleanText(body.couponCode, "Coupon code", 30).toUpperCase();
+  if (couponCode) {
+    coupon = await Coupon.findOne({ code: couponCode, active: true }).lean();
+    if (!coupon) throw new HttpError(400, "This coupon is invalid or unavailable.");
+    discount = priceForCoupon(coupon, subtotal);
+    const reserved = await Coupon.findOneAndUpdate(
       {
-        _id: candidate._id,
+        _id: coupon._id,
         active: true,
         expiresAt: { $gt: new Date() },
-        usageCount: { $lt: candidate.usageLimit },
+        minimumOrderValue: { $lte: subtotal },
+        $expr: { $lt: ["$usageCount", "$usageLimit"] },
       },
       { $inc: { usageCount: 1 } },
       { new: true },
     );
-    if (!coupon) throw new HttpError(400, "This coupon is expired or has reached its usage limit.");
+    if (!reserved) throw new HttpError(400, "This coupon has expired or reached its usage limit.");
+    coupon = reserved;
+    discount = Math.min(
+      coupon.type === "percentage" ? Math.floor((subtotal * coupon.value) / 100) : coupon.value,
+      subtotal,
+    );
   }
+
   const shipping = subtotal - discount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
   try {
     const order = await Order.create({
@@ -315,9 +359,7 @@ export async function createCheckoutOrder(req, res) {
       message: "Checkout saved. Payment will be available in the next module.",
     });
   } catch (error) {
-    if (coupon) {
-      await Coupon.updateOne({ _id: coupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
-    }
+    if (coupon) await Coupon.updateOne({ _id: coupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
     if (error.code === 11000) {
       const duplicate = await Order.findOne({ checkoutToken }).select("orderNumber subtotal discount shipping amount");
       if (duplicate) {
@@ -353,11 +395,20 @@ function couponInput(body, existingUsage = 0) {
     throw new HttpError(400, `Usage limit cannot be less than existing usage (${existingUsage}).`);
   }
   if (Number.isNaN(expiresAt.getTime())) throw new HttpError(400, "Choose a valid expiry date.");
-  return { code, type: body.type, value, minimumOrderValue, usageLimit, expiresAt, active: Boolean(body.active) };
+  return {
+    code,
+    type: body.type,
+    value,
+    minimumOrderValue,
+    usageLimit,
+    expiresAt,
+    active: Boolean(body.active),
+  };
 }
 
 export async function getAdminCoupons(req, res) {
-  res.json(await Coupon.find().sort({ createdAt: -1 }).lean());
+  const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
+  res.json(coupons);
 }
 
 export async function createAdminCoupon(req, res) {
