@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
+import { SupportPage, TrackingPage } from "./PostPurchase.jsx";
 
 const FREE_SHIPPING_THRESHOLD = 1499;
 const AUTH_KEY = "alpha:customer-token";
@@ -29,7 +30,7 @@ function StoreHeader({ cart, navigate }) {
   return (
     <header className="store-header">
       <a className="store-wordmark" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a>
-      <nav aria-label="Main navigation"><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>The collection</a><a href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>My account</a></nav>
+      <nav aria-label="Main navigation"><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>The collection</a><a href="/track" onClick={(event) => { event.preventDefault(); navigate("/track"); }}>Track order</a><a href="/support" onClick={(event) => { event.preventDefault(); navigate("/support"); }}>Support</a><a href="/account" onClick={(event) => { event.preventDefault(); navigate("/account"); }}>My account</a></nav>
       <a className="store-cart-link" href="/cart" onClick={(event) => { event.preventDefault(); navigate("/cart"); }}>Bag <span>{count}</span></a>
     </header>
   );
@@ -595,6 +596,10 @@ export default function Storefront({ path, cart, setCart, navigate }) {
     content = <CheckoutPage cart={cart} setCart={setCart} navigate={navigate} />;
   } else if (path === "/account") {
     content = <LoginAndAccount navigate={navigate} />;
+  } else if (path === "/track") {
+    content = <TrackingPage />;
+  } else if (path === "/support") {
+    content = <SupportPage />;
   } else if (productMatch) {
     content = <ProductDetail slug={decodeURIComponent(productMatch[1])} navigate={navigate} addToCart={addToCart} />;
   } else if (path === "/products") {

@@ -33,7 +33,7 @@ app.post(
   express.raw({ type: "application/json", limit: "30kb" }),
   (req, res, next) => Promise.resolve(handleCourierWebhook(req, res)).catch(next),
 );
-app.use(express.json({ limit: "30kb" }));
+app.use(express.json({ limit: "2mb" }));
 app.use("/api", apiRouter);
 
 app.use((error, req, res, next) => {

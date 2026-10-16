@@ -3,6 +3,7 @@ import * as controller from "../controllers/apiController.js";
 import * as storeController from "../controllers/storeController.js";
 import * as paymentController from "../controllers/paymentController.js";
 import * as fulfilmentController from "../controllers/fulfilmentController.js";
+import * as postPurchaseController from "../controllers/postPurchaseController.js";
 import { optionalCustomer, requireCustomer } from "../utils/customerAuth.js";
 
 const router = Router();
@@ -32,6 +33,16 @@ router.post("/payments/order-details", optionalCustomer, asyncRoute(paymentContr
 router.post("/payments/razorpay/order", optionalCustomer, asyncRoute(paymentController.createRazorpayOrder));
 router.post("/payments/razorpay/verify", optionalCustomer, asyncRoute(paymentController.verifyRazorpayPayment));
 router.post("/payments/cod/confirm", optionalCustomer, asyncRoute(paymentController.confirmCashOnDelivery));
+router.post("/tracking", asyncRoute(postPurchaseController.trackOrder));
+router.post("/returns", asyncRoute(postPurchaseController.createReturnRequest));
+router.post("/support/tickets", asyncRoute(postPurchaseController.createSupportTicket));
+router.get("/admin/post-purchase/returns", asyncRoute(postPurchaseController.listReturns));
+router.get("/admin/post-purchase/returns/:id/photo", asyncRoute(postPurchaseController.getReturnPhoto));
+router.patch("/admin/post-purchase/returns/:id", asyncRoute(postPurchaseController.updateReturn));
+router.get("/admin/post-purchase/tickets", asyncRoute(postPurchaseController.listSupportTickets));
+router.patch("/admin/post-purchase/tickets/:id", asyncRoute(postPurchaseController.updateSupportTicket));
+router.get("/admin/post-purchase/notifications", asyncRoute(postPurchaseController.listNotificationLogs));
+router.post("/admin/post-purchase/notifications/:id/retry", asyncRoute(postPurchaseController.retryNotification));
 router.get("/admin/fulfilment/orders", asyncRoute(fulfilmentController.listFulfilmentOrders));
 router.post("/admin/fulfilment/bulk/print", asyncRoute(fulfilmentController.bulkPrint));
 router.post("/admin/fulfilment/bulk/pack", asyncRoute(fulfilmentController.bulkPack));

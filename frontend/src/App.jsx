@@ -4,6 +4,7 @@ import { captureFirstTouch } from "./attribution.js";
 import Storefront from "./Storefront.jsx";
 import CouponAdmin from "./CouponAdmin.jsx";
 import FulfilmentAdmin from "./FulfilmentAdmin.jsx";
+import { PostPurchaseAdmin } from "./PostPurchase.jsx";
 
 const emptyForm = {
   productId: "",
@@ -58,6 +59,8 @@ export default function App() {
   }, [cart]);
   if (path === "/admin" || path.startsWith("/admin/")) {
     if (path === "/admin/fulfilment" || path === "/admin/orders") return <FulfilmentAdmin navigate={navigate} />;
+    if (path === "/admin/returns") return <PostPurchaseAdmin mode="returns" navigate={navigate} />;
+    if (path === "/admin/support") return <PostPurchaseAdmin mode="support" navigate={navigate} />;
     if (path === "/admin/coupons") return <CouponAdmin navigate={navigate} />;
     return <Admin navigate={navigate} />;
   }
@@ -392,6 +395,8 @@ function Admin({ navigate }) {
         <div className="admin-title"><span>CAMPAIGN STUDIO</span><strong>Module 01 · Acquire</strong></div>
         <div className="admin-header-links">
           <a className="admin-preview-link" href="/admin/fulfilment" onClick={(event) => { event.preventDefault(); navigate("/admin/fulfilment"); }}>Fulfilment</a>
+          <a className="admin-preview-link" href="/admin/returns" onClick={(event) => { event.preventDefault(); navigate("/admin/returns"); }}>Returns</a>
+          <a className="admin-preview-link" href="/admin/support" onClick={(event) => { event.preventDefault(); navigate("/admin/support"); }}>Support</a>
           <a className="admin-preview-link" href="/admin/coupons" onClick={(event) => { event.preventDefault(); navigate("/admin/coupons"); }}>Coupons</a>
           <a className="admin-preview-link" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>View storefront ↗</a>
         </div>

@@ -1,0 +1,96 @@
+.post-page {
+  max-width: 1080px;
+  min-height: 62vh;
+  margin: 0 auto;
+  padding: 76px 7vw 110px;
+}
+.post-eyebrow { margin: 0 0 12px; color: #777970; font-size: 9px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+.post-page > h1, .post-admin-title h1 { margin: 0; font-family: "Playfair Display", Georgia, serif; font-size: clamp(42px, 6vw, 68px); font-weight: 500; letter-spacing: -.055em; }
+.post-page > h1 em { font-weight: 500; }
+.post-lede { max-width: 590px; margin: 13px 0 30px; color: #73746c; font-size: 13px; line-height: 1.7; }
+.post-form { display: grid; gap: 16px; }
+.post-form label, .post-admin-section label { display: grid; gap: 7px; color: #55574f; font-size: 10px; font-weight: 700; }
+.post-form input, .post-form textarea, .post-form select, .post-admin-section input, .post-admin-section textarea, .post-admin-section select {
+  width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #d9d8d0; border-radius: 0; background: transparent; color: #191b18; font: inherit; font-size: 12px;
+}
+.post-form textarea, .post-admin-section textarea { resize: vertical; }
+.post-lookup { max-width: 540px; grid-template-columns: 1fr 1fr; align-items: end; padding: 22px; background: #eeece4; }
+.post-lookup .post-error, .post-lookup .post-button { grid-column: 1 / -1; }
+.post-button { min-height: 46px; justify-self: start; padding: 0 18px; border: 0; background: #191b18; color: #fff; font-size: 10px; font-weight: 700; cursor: pointer; }
+.post-button:disabled, .post-admin-actions button:disabled, .post-notification-row button:disabled { cursor: not-allowed; opacity: .55; }
+.post-error { margin: 0; padding: 11px 13px; background: #f5e4df; color: #812d21; font-size: 11px; }
+.post-error-copy { color: #812d21 !important; }
+.post-notice { margin: 0; padding: 11px 13px; background: #e9eed8; color: #485322; font-size: 11px; }
+.post-order-card { margin-top: 32px; padding: clamp(20px, 4vw, 38px); background: #eeece4; }
+.post-order-heading, .post-admin-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 18px; }
+.post-order-heading h2, .post-admin-card h2 { margin: 5px 0; font-family: "Playfair Display", Georgia, serif; font-size: 26px; font-weight: 500; }
+.post-order-heading > span { color: #74756d; font-size: 10px; }
+.post-shipment { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 19px; padding: 14px 0; border-top: 1px solid #d9d8d0; border-bottom: 1px solid #d9d8d0; font-size: 11px; }
+.post-shipment a { text-decoration: underline; text-underline-offset: 3px; }
+.post-muted { color: #777970; font-size: 11px; line-height: 1.6; }
+.post-timeline { list-style: none; margin: 20px 0 25px; padding: 0; }
+.post-timeline li { display: grid; grid-template-columns: 16px 1fr; gap: 12px; min-height: 54px; position: relative; }
+.post-timeline li:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 12px; bottom: -2px; width: 1px; background: #c6c6b9; }
+.post-timeline-mark { width: 11px; height: 11px; margin-top: 2px; border: 2px solid #899735; border-radius: 50%; background: #eeece4; z-index: 1; }
+.post-timeline li > div { display: grid; grid-template-columns: 1fr auto; align-content: start; gap: 3px 15px; font-size: 11px; }
+.post-timeline time, .post-timeline p { color: #777970; font-size: 9px; }
+.post-timeline p { grid-column: 1 / -1; margin: 3px 0 0; line-height: 1.5; }
+.post-order-items { max-width: 500px; padding-top: 7px; border-top: 1px solid #d9d8d0; }
+.post-order-items h3, .return-form h3 { margin: 12px 0; font-family: "Playfair Display", Georgia, serif; font-size: 19px; font-weight: 500; }
+.post-order-items p { display: flex; justify-content: space-between; gap: 14px; margin: 9px 0; font-size: 11px; }
+.return-form { max-width: 620px; margin-top: 28px; padding-top: 21px; border-top: 1px solid #d9d8d0; }
+.return-form h3 { margin: 0; }
+.return-form > p { margin: -8px 0 0; }
+.post-return-items { display: grid; border-top: 1px solid #d9d8d0; }
+.post-return-item { display: grid !important; grid-template-columns: 17px 1fr 72px; align-items: center; min-height: 51px; padding: 8px 0; border-bottom: 1px solid #d9d8d0; }
+.post-return-item input[type="checkbox"] { width: 16px; min-height: auto; height: 16px; padding: 0; }
+.post-return-item span { color: #191b18 !important; font-size: 11px !important; font-weight: 500 !important; }
+.post-return-item small, .return-form label small { display: block; margin-top: 3px; color: #777970; font-size: 9px; font-weight: 400; }
+.post-return-item input[type="number"] { min-height: 34px; padding: 6px; }
+.post-support-form { max-width: 730px; grid-template-columns: 1fr 1fr; padding: 24px; background: #eeece4; }
+.post-support-form .post-wide { grid-column: 1 / -1; }
+.post-admin { min-height: 100vh; background: #f4f2ec; color: #191b18; }
+.post-admin-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 68px; padding: 12px 5vw; border-bottom: 1px solid #d9d8d0; }
+.post-admin-header > a { font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.post-admin-header nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.post-admin-header button { padding: 9px 12px; border: 1px solid #d9d8d0; background: transparent; font-size: 10px; cursor: pointer; }
+.post-admin-section { max-width: 1240px; margin: 0 auto; padding: 48px 5vw 90px; }
+.post-admin-title { display: flex; justify-content: space-between; align-items: end; gap: 22px; margin-bottom: 24px; }
+.post-admin-title h1 { font-size: clamp(34px, 4vw, 52px); }
+.post-admin-title label { width: min(270px, 36vw); }
+.post-admin-list { display: grid; gap: 13px; margin: 18px 0 32px; }
+.post-admin-card { padding: 22px; border: 1px solid #d9d8d0; background: #f8f7f2; }
+.post-admin-card-heading { margin-bottom: 13px; }
+.post-admin-card-heading > strong { font-size: 11px; white-space: nowrap; }
+.post-admin-card-heading span, .post-admin-card p, .post-admin-card li { color: #67685f; font-size: 10px; line-height: 1.6; }
+.post-admin-card > p { margin: 8px 0; }
+.post-admin-card ul { margin: 6px 0 12px; padding-left: 20px; }
+.post-admin-card a { display: inline-block; margin: 5px 0; font-size: 10px; text-decoration: underline; }
+.post-admin-actions { display: flex; align-items: end; gap: 9px; margin: 14px 0; }
+.post-admin-actions button, .post-notification-row button { min-height: 38px; padding: 0 13px; border: 0; background: #191b18; color: #fff; font-size: 10px; cursor: pointer; }
+.post-admin-actions label { min-width: 180px; }
+.post-admin-card .post-timeline { margin-bottom: 0; }
+.post-subheading { margin: 34px 0 9px; font-family: "Playfair Display", Georgia, serif; font-size: 26px; font-weight: 500; }
+.post-ticket-message { padding: 13px; background: #eeece4; }
+.post-ticket-reply { margin: 9px 0; padding: 12px; border-left: 2px solid #879432; background: #eeece4; font-size: 10px; }
+.post-ticket-reply p { margin: 6px 0; }
+.post-ticket-reply time { color: #777970; font-size: 9px; }
+.post-notification-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 17px; border: 1px solid #d9d8d0; background: #f8f7f2; }
+.post-notification-row > div { display: grid; gap: 5px; font-size: 10px; }
+.post-notification-row span, .post-notification-row small { color: #777970; font-size: 9px; }
+
+@media (max-width: 680px) {
+  .post-page { padding: 54px 6vw 76px; }
+  .post-lookup, .post-support-form { grid-template-columns: 1fr; padding: 17px; }
+  .post-support-form .post-wide, .post-lookup .post-error, .post-lookup .post-button { grid-column: auto; }
+  .post-admin-header { align-items: flex-start; flex-direction: column; }
+  .post-admin-header nav { width: 100%; }
+  .post-admin-header button { flex: 1; }
+  .post-admin-section { padding: 34px 5vw 65px; }
+  .post-admin-title { align-items: stretch; flex-direction: column; }
+  .post-admin-title label { width: 100%; }
+  .post-admin-card-heading { flex-direction: column; }
+  .post-admin-actions { align-items: stretch; flex-direction: column; }
+  .post-admin-actions label { min-width: 0; }
+  .post-notification-row { align-items: flex-start; flex-direction: column; }
+}

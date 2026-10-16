@@ -266,8 +266,9 @@
 @media (max-width: 640px) {
   .store-header { height: 62px; gap: 12px; padding: 0 17px; }
   .store-wordmark { font-size: 17px; }
-  .store-header nav { gap: 12px; }
-  .store-header nav a { font-size: 8px; }
+  .store-header nav { flex: 1; min-width: 0; justify-content: flex-start; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .store-header nav::-webkit-scrollbar { display: none; }
+  .store-header nav a { flex: 0 0 auto; font-size: 8px; white-space: nowrap; }
   .store-cart-link { gap: 5px; font-size: 8px; }
   .store-cart-link span { width: 20px; min-width: 20px; height: 20px; }
   .store-home-hero { min-height: 0; grid-template-columns: 1fr; padding: 0 20px; }

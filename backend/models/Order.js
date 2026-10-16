@@ -97,6 +97,9 @@ const orderSchema = new mongoose.Schema(
     stockRestoredAt: { type: Date },
     stockRestoreLock: { type: String, select: false },
     refundStatus: { type: String, enum: ["not_required", "refund_pending", "refunded"], default: "not_required" },
+    amountRefunded: { type: Number, min: 0, default: 0 },
+    returnRequestLock: { type: String, select: false },
+    returnWorkflowLock: { type: String, select: false },
     codConversionPending: { type: Boolean, default: false },
     utm: {
       source: { type: String, trim: true, maxlength: 200 },

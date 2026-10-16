@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import HttpError from "../utils/HttpError.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import { sendOrderNotification } from "../utils/orderNotifications.js";
 
 const COD_LIMIT = 3000;
 const PREPAID_DISCOUNT_PERCENT = 5;
@@ -308,6 +309,12 @@ export async function verifyRazorpayPayment(req, res) {
     return res.json(paymentSummary(order));
   }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
+    await sendOrderNotification(order, "order_placed").catch((error) => {
+      console.error("Could not record the order-placed notification.", {
+        orderNumber: order.orderNumber,
+        error: error.message,
+      });
+    });
     return res.json(paymentSummary(order));
   }
   const partial = order.paymentMethod === "partial_cod";
@@ -318,6 +325,12 @@ export async function verifyRazorpayPayment(req, res) {
     razorpaySignature: signature,
     amountPaid: order.paymentAmount,
   });
+  await sendOrderNotification(settled, "order_placed").catch((error) => {
+    console.error("Could not record the order-placed notification.", {
+      orderNumber: settled.orderNumber,
+      error: error.message,
+    });
+  });
   res.json(paymentSummary(settled));
 }
 
@@ -326,7 +339,15 @@ export async function confirmCashOnDelivery(req, res) {
   if (order.fulfillmentStatus === "Cancelled") {
     throw new HttpError(409, "This order was cancelled and cannot be confirmed for COD.");
   }
-  if (order.status === "CODConfirmed") return res.json(paymentSummary(order));
+  if (order.status === "CODConfirmed") {
+    await sendOrderNotification(order, "order_placed").catch((error) => {
+      console.error("Could not record the order-placed notification.", {
+        orderNumber: order.orderNumber,
+        error: error.message,
+      });
+    });
+    return res.json(paymentSummary(order));
+  }
   if (!["PendingPayment", "Failed", "CODPendingConfirmation"].includes(order.status)) {
     throw new HttpError(409, "This order is not available for COD confirmation.");
   }
@@ -370,6 +391,12 @@ export async function confirmCashOnDelivery(req, res) {
     paymentStatus: "cod_pending",
     amountPaid: 0,
     codDue: total,
+  });
+  await sendOrderNotification(settled, "order_placed").catch((error) => {
+    console.error("Could not record the order-placed notification.", {
+      orderNumber: settled.orderNumber,
+      error: error.message,
+    });
   });
   res.json(paymentSummary(settled));
 }
@@ -429,14 +456,26 @@ export async function handleRazorpayWebhook(req, res) {
     return res.json({ received: true, processed: true, refundPending: true });
   }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
+    await sendOrderNotification(order, "order_placed").catch((error) => {
+      console.error("Could not record the order-placed notification.", {
+        orderNumber: order.orderNumber,
+        error: error.message,
+      });
+    });
     return res.json({ received: true, processed: true });
   }
   const partial = order.paymentMethod === "partial_cod";
-  await deductStockOnce(order, {
+  const settled = await deductStockOnce(order, {
     status: partial ? "CODConfirmed" : "Paid",
     paymentStatus: partial ? "partially_paid" : "paid",
     razorpayPaymentId: payment.id,
     amountPaid: order.paymentAmount,
+  });
+  await sendOrderNotification(settled, "order_placed").catch((error) => {
+    console.error("Could not record the order-placed notification.", {
+      orderNumber: settled.orderNumber,
+      error: error.message,
+    });
   });
   res.json({ received: true, processed: true });
 }

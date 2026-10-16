@@ -4,6 +4,7 @@ import LandingPage from "../models/LandingPage.js";
 import Customer from "../models/Customer.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import { sendOrderNotification } from "../utils/orderNotifications.js";
 
 const text = (value, field, maxLength, { required = false } = {}) => {
   if (typeof value !== "string") {
@@ -171,6 +172,12 @@ export async function createOrder(req, res) {
     },
     amount: product.price,
     utm,
+  });
+  await sendOrderNotification(order, "order_placed").catch((error) => {
+    console.error("Could not record the order-placed notification.", {
+      orderNumber: order.orderNumber,
+      error: error.message,
+    });
   });
   res.status(201).json({ orderNumber: order.orderNumber, amount: order.amount });
 }

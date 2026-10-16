@@ -1,6 +1,6 @@
-# Alpha Male D2C — Modules 1–4
+# Alpha Male D2C — Modules 1–5
 
-The Alpha Male MERN assignment implemented through Module 4: campaign acquisition, storefront and checkout, test-mode payments, and the operations fulfilment desk.
+The Alpha Male MERN assignment implemented through Module 5: campaign acquisition, storefront and checkout, test-mode payments, fulfilment operations, order tracking, returns, and customer support.
 
 ## Project layout
 
@@ -89,6 +89,21 @@ Shipping labels are generated as 4 × 6 inch PDFs and include a QR code, AWB, ad
 
 The fulfilment screen is an unauthenticated local assignment tool, and the operator name is an audit label supplied by the browser—not verified identity. Do not expose it publicly without staff authentication, authorization, and an actual courier integration.
 
+## Module 5 post-purchase
+
+- `/track` — public order tracking; customers verify with the order number and checkout mobile number. It shows the status timeline, AWB, courier, and any configured carrier tracking link.
+- `/support` — creates a customer support ticket, optionally linked to an order after validating the same order number/mobile pair.
+- `/admin/returns` — review return requests, approve or reject, record pickup, and complete a refund.
+- `/admin/support` — move tickets between Open, In progress, and Closed; add internal replies; inspect/retry failed order notifications.
+
+Returns are limited to seven days after the recorded Delivered event. Customers can select item quantities, choose a reason, add details, and upload an optional JPEG/PNG/WebP photo up to 1 MB. The photo is stored in MongoDB with the return request. The server prevents duplicate return quantities and calculates the merchandise refund after saved coupon/prepaid discounts. Razorpay refunds require a captured payment and are sent from the backend in the configured Razorpay mode; never use live credentials for this assignment. COD refunds are manual and require an operator-entered refund reference. If a Razorpay request times out, the attempt is held for dashboard reconciliation to avoid accidentally issuing a duplicate refund.
+
+Notifications are recorded once per order event (`order_placed`, `shipped`, `delivered`) and visible in `/admin/support`. Delivery failures are retained and the admin can retry only failed channels. Email uses Resend when configured; in local development, missing Resend settings log the event instead. Set `RESEND_API_KEY` and `NOTIFICATION_FROM_EMAIL` to deliver real email. The secondary message channel is selected with `POST_PURCHASE_MESSAGE_CHANNEL`: `mock` logs locally, `sms` uses the existing Twilio credentials, and `whatsapp` uses a Meta WhatsApp Business Cloud API template. WhatsApp template must have four body parameters, in order: customer name, order number, event status, and tracking URL. Configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_TEMPLATE_NAME`; optional language and Graph API version settings are in `.env.example`. Set `CLIENT_PUBLIC_URL` to the deployed frontend URL for customer tracking links.
+
+For a local check, complete a COD-confirmed or test-mode prepaid order; open its `/track` page using the exact order number/mobile. Pack and book its mock shipment from `/admin/fulfilment` to create the shipped notification, then send a signed courier webhook with status `delivered`. The tracking page will show the delivered event and allow a return request within seven days. Review the request in `/admin/returns` and advance it through Approved → Picked up → Refunded. A captured Razorpay order needs test API credentials for refunding; COD uses a manual refund reference. Create a ticket at `/support` and manage it at `/admin/support`.
+
+Post-purchase admin endpoints, like the earlier assignment admin tools, are unauthenticated. Do not expose them publicly without staff authentication and authorization.
+
 ## API routes
 
 - `GET /api/health`
@@ -104,6 +119,10 @@ The fulfilment screen is an unauthenticated local assignment tool, and the opera
 - `POST /api/payments/razorpay/order`, `POST /api/payments/razorpay/verify`
 - `POST /api/payments/cod/confirm`
 - `POST /api/payments/webhook` — Razorpay signed raw-body webhook
+- `POST /api/tracking`, `POST /api/returns`, `POST /api/support/tickets`
+- `GET /api/admin/post-purchase/returns`, `PATCH /api/admin/post-purchase/returns/:id`, `GET /api/admin/post-purchase/returns/:id/photo`
+- `GET /api/admin/post-purchase/tickets`, `PATCH /api/admin/post-purchase/tickets/:id`
+- `GET /api/admin/post-purchase/notifications`, `POST /api/admin/post-purchase/notifications/:id/retry`
 - `GET /api/admin/fulfilment/orders`, `GET /api/admin/fulfilment/orders/:id`
 - `PATCH /api/admin/fulfilment/orders/:id/status`, `POST /api/admin/fulfilment/orders/:id/notes`
 - `POST /api/admin/fulfilment/orders/:id/shipment`, `POST /api/admin/fulfilment/orders/:id/ndr`

@@ -70,6 +70,29 @@ export const api = {
       body: JSON.stringify(order),
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     }),
+  trackOrder: (details) =>
+    request("/tracking", { method: "POST", body: JSON.stringify(details) }),
+  requestReturn: (details) =>
+    request("/returns", { method: "POST", body: JSON.stringify(details) }),
+  createSupportTicket: (ticket) =>
+    request("/support/tickets", { method: "POST", body: JSON.stringify(ticket) }),
+  getReturnRequests: (status = "") =>
+    request(`/admin/post-purchase/returns${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  updateReturnRequest: (id, update) =>
+    request(`/admin/post-purchase/returns/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(update),
+    }),
+  getSupportTickets: (status = "") =>
+    request(`/admin/post-purchase/tickets${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  updateSupportTicket: (id, update) =>
+    request(`/admin/post-purchase/tickets/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(update),
+    }),
+  getNotificationLogs: () => request("/admin/post-purchase/notifications"),
+  retryNotification: (id) =>
+    request(`/admin/post-purchase/notifications/${encodeURIComponent(id)}/retry`, { method: "POST" }),
   getAdminCoupons: () => request("/admin/coupons"),
   saveAdminCoupon: (coupon, id) =>
     request(id ? `/admin/coupons/${id}` : "/admin/coupons", {

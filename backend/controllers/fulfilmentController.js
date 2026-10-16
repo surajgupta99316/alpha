@@ -7,6 +7,7 @@ import HttpError from "../utils/HttpError.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Sequence from "../models/Sequence.js";
+import { sendOrderNotification } from "../utils/orderNotifications.js";
 
 const PAGE_SIZE_MAX = 100;
 const BULK_LIMIT = 50;
@@ -278,6 +279,10 @@ export async function changeFulfilmentStatus(req, res) {
       _id: order._id,
       ...fulfilmentStatusFilter(previousStatus),
       ...(nextStatus === "Cancelled" ? { settlementLock: { $exists: false } } : {}),
+      ...(nextStatus === "Returned" ? {
+        returnRequestLock: { $exists: false },
+        returnWorkflowLock: { $exists: false },
+      } : {}),
     },
     update,
     { new: true },
@@ -652,7 +657,15 @@ export async function bookShipment(req, res) {
   const actor = actorName(req.body?.actor);
   const order = await Order.findById(id);
   if (!order) throw new HttpError(404, "Order was not found.");
-  if (order.shipment?.awb) return res.json(orderSummary(order.toObject()));
+  if (order.shipment?.awb) {
+    await sendOrderNotification(order, "shipped").catch((error) => {
+      console.error("Could not record the shipped notification.", {
+        orderNumber: order.orderNumber,
+        error: error.message,
+      });
+    });
+    return res.json(orderSummary(order.toObject()));
+  }
   if (order.fulfillmentStatus !== "Packed") throw new HttpError(409, "Pack the order before booking a courier.");
   const awb = `AMX${Date.now().toString(36).toUpperCase()}${randomInt(1000, 9999)}`;
   const courierName = courierForPincode(order.customer.pincode, order.customer.state);
@@ -678,6 +691,12 @@ export async function bookShipment(req, res) {
     { new: true },
   );
   if (!booked) throw new HttpError(409, "Shipment booking changed concurrently. Refresh the order and try again.");
+  await sendOrderNotification(booked, "shipped").catch((error) => {
+    console.error("Could not record the shipped notification.", {
+      orderNumber: booked.orderNumber,
+      error: error.message,
+    });
+  });
   res.status(201).json(orderSummary(booked.toObject()));
 }
 
@@ -717,6 +736,14 @@ export async function handleCourierWebhook(req, res) {
   const order = await Order.findOne({ "shipment.awb": awb });
   if (!order) throw new HttpError(404, "No order matches this AWB.");
   if (order.shipment.processedEvents?.includes(eventId)) {
+    if (targetStatus === "Delivered") {
+      await sendOrderNotification(order, "delivered").catch((error) => {
+        console.error("Could not record the delivered notification.", {
+          orderNumber: order.orderNumber,
+          error: error.message,
+        });
+      });
+    }
     return res.json({ received: true, duplicate: true });
   }
   const previousStatus = order.fulfillmentStatus;
@@ -757,6 +784,14 @@ export async function handleCourierWebhook(req, res) {
     const latest = await Order.findById(order._id).lean();
     if (latest?.shipment?.processedEvents?.includes(eventId)) return res.json({ received: true, duplicate: true });
     throw new HttpError(409, "Order changed while processing this courier event. Retry with the same event ID.");
+  }
+  if (targetStatus === "Delivered") {
+    await sendOrderNotification(saved, "delivered").catch((error) => {
+      console.error("Could not record the delivered notification.", {
+        orderNumber: saved.orderNumber,
+        error: error.message,
+      });
+    });
   }
   res.json({ received: true, status: saved.fulfillmentStatus, ndrAttempts: saved.shipment.ndrAttempts });
 }

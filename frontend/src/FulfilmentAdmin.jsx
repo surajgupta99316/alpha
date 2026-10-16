@@ -243,6 +243,8 @@ export default function FulfilmentAdmin({ navigate }) {
         <nav className="fulfilment-header-links" aria-label="Admin navigation">
           <a href="/admin" onClick={(event) => { event.preventDefault(); navigate("/admin"); }}>Campaigns</a>
           <a href="/admin/coupons" onClick={(event) => { event.preventDefault(); navigate("/admin/coupons"); }}>Coupons</a>
+          <a href="/admin/returns" onClick={(event) => { event.preventDefault(); navigate("/admin/returns"); }}>Returns</a>
+          <a href="/admin/support" onClick={(event) => { event.preventDefault(); navigate("/admin/support"); }}>Support</a>
           <a href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>Storefront ↗</a>
         </nav>
       </header>
