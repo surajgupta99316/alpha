@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as controller from "../controllers/apiController.js";
 import * as storeController from "../controllers/storeController.js";
+import * as paymentController from "../controllers/paymentController.js";
 import { optionalCustomer, requireCustomer } from "../utils/customerAuth.js";
 
 const router = Router();
@@ -26,6 +27,10 @@ router.post("/auth/otp/verify", asyncRoute(storeController.verifyLoginOtp));
 router.get("/auth/me", requireCustomer, asyncRoute(storeController.getMyAccount));
 router.get("/auth/orders", requireCustomer, asyncRoute(storeController.getMyOrders));
 router.post("/store/checkout", optionalCustomer, asyncRoute(storeController.createCheckoutOrder));
+router.post("/payments/order-details", optionalCustomer, asyncRoute(paymentController.getPaymentSummary));
+router.post("/payments/razorpay/order", optionalCustomer, asyncRoute(paymentController.createRazorpayOrder));
+router.post("/payments/razorpay/verify", optionalCustomer, asyncRoute(paymentController.verifyRazorpayPayment));
+router.post("/payments/cod/confirm", optionalCustomer, asyncRoute(paymentController.confirmCashOnDelivery));
 router.get("/admin/coupons", asyncRoute(storeController.getAdminCoupons));
 router.post("/admin/coupons", asyncRoute(storeController.createAdminCoupon));
 router.put("/admin/coupons/:id", asyncRoute(storeController.updateAdminCoupon));

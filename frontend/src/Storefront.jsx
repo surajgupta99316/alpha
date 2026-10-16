@@ -4,7 +4,25 @@ import { api } from "./api.js";
 const FREE_SHIPPING_THRESHOLD = 1499;
 const AUTH_KEY = "alpha:customer-token";
 const COUPON_KEY = "alpha:cart-coupon";
+const CHECKOUT_ORDER_KEY = "alpha:last-checkout";
 const money = (amount) => `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) return Promise.resolve();
+  const source = "https://checkout.razorpay.com/v1/checkout.js";
+  let script = document.querySelector(`script[src="${source}"]`);
+  if (!script) {
+    script = document.createElement("script");
+    script.src = source;
+    script.async = true;
+    document.body.appendChild(script);
+  }
+  return new Promise((resolve, reject) => {
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", () => reject(new Error("Razorpay checkout could not be loaded. Check your connection and retry.")), { once: true });
+    if (window.Razorpay) resolve();
+  });
+}
 
 function StoreHeader({ cart, navigate }) {
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -288,6 +306,10 @@ function CheckoutPage({ cart, setCart, navigate }) {
         pincode: form.pincode,
         couponCode: coupon?.code || "",
       }, token);
+      window.localStorage.setItem(CHECKOUT_ORDER_KEY, JSON.stringify({
+        orderNumber: result.orderNumber,
+        checkoutToken: result.checkoutToken,
+      }));
       setCart([]);
       window.localStorage.removeItem(COUPON_KEY);
       navigate(`/checkout/success/${encodeURIComponent(result.orderNumber)}`);
@@ -351,12 +373,206 @@ function LoginAndAccount({ navigate }) {
     setToken(""); setCustomer(null); setOrders([]); setCode(""); setRequested(false); setNotice("You’ve signed out.");
   }
   return (
-    <section className="store-section account-page"><p className="store-eyebrow"><span /> YOUR ALPHA ACCOUNT</p><h1 className="store-page-title">The story so <em>far.</em></h1>{error && <p className="store-error" role="alert">{error}</p>}{notice && <p className="account-notice" role="status">{notice}</p>}{customer ? <><div className="account-welcome"><div><span>GOOD TO HAVE YOU BACK</span><h2>{customer.fullName || customer.phone}</h2></div><button className="store-button store-button-outline" onClick={signOut} type="button">Sign out</button></div><h2 className="account-orders-title">Your orders <span>{orders.length}</span></h2>{orders.length ? <div className="account-order-list">{orders.map((order) => <article className="account-order-card" key={order._id}><div className="account-order-top"><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span><span className="account-order-status">{order.status}</span></div>{(order.items?.length ? order.items : order.product ? [{ ...order.product, lineTotal: order.amount }] : []).map((item, index) => <div className="account-order-item" key={`${order._id}-${index}`}><span>{item.name} × {item.quantity}</span><strong>{money(item.lineTotal ?? item.unitPrice * item.quantity)}</strong></div>)}<div className="account-order-total"><span>Order total</span><strong>{money(order.amount)}</strong></div></article>)}</div> : <div className="account-no-orders"><p>Your order story starts with one good choice.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection ↗</button></div>}</> : <div className="account-login-layout"><div className="account-login-note"><span>✳</span><h2>Your orders,<br /><em>all in one place.</em></h2><p>Sign in with your mobile number to see your order history. No password, no fuss.</p></div><form className="account-login-card" onSubmit={requested ? verifyCode : requestCode}><p className="store-eyebrow">{requested ? "02 / VERIFY IT’S YOU" : "01 / YOUR MOBILE NUMBER"}</p><h2>{requested ? "One little code." : "Welcome back."}</h2><label>Mobile number<input autoComplete="tel" disabled={requested} inputMode="numeric" maxLength="10" onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} pattern="[0-9]{10}" required value={phone} placeholder="10-digit number" /></label>{requested && <label>6-digit verification code<input autoComplete="one-time-code" inputMode="numeric" maxLength="6" onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} pattern="[0-9]{6}" required value={code} placeholder="Check backend terminal in local development" /></label>}{error && <p className="form-error" role="alert">{error}</p>}<button className="store-button store-button-dark" disabled={busy} type="submit">{busy ? "Just a moment…" : requested ? "Verify & sign in" : "Send one-time code"} <span>↗</span></button>{requested && <button className="account-change-number" onClick={() => { setRequested(false); setCode(""); setError(""); }} type="button">Change mobile number</button>}<p className="account-privacy">One-time codes expire in 5 minutes and can only be used once.</p></form></div>}</section>
+    <section className="store-section account-page">
+      <p className="store-eyebrow"><span /> YOUR ALPHA ACCOUNT</p>
+      <h1 className="store-page-title">The story so <em>far.</em></h1>
+      {error && <p className="store-error" role="alert">{error}</p>}
+      {notice && <p className="account-notice" role="status">{notice}</p>}
+      {customer ? (
+        <>
+          <div className="account-welcome">
+            <div><span>GOOD TO HAVE YOU BACK</span><h2>{customer.fullName || customer.phone}</h2></div>
+            <button className="store-button store-button-outline" onClick={signOut} type="button">Sign out</button>
+          </div>
+          <h2 className="account-orders-title">Your orders <span>{orders.length}</span></h2>
+          {orders.length ? (
+            <div className="account-order-list">
+              {orders.map((order) => (
+                <article className="account-order-card" key={order._id}>
+                  <div className="account-order-top">
+                    <strong>{order.orderNumber}</strong>
+                    <span>{new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                    <span className="account-order-status">{order.status} · {order.paymentMethod || "Payment pending"}</span>
+                  </div>
+                  {(order.items?.length ? order.items : order.product ? [{ ...order.product, lineTotal: order.amount }] : []).map((item, index) => (
+                    <div className="account-order-item" key={`${order._id}-${index}`}>
+                      <span>{item.name} × {item.quantity}</span>
+                      <strong>{money(item.lineTotal ?? item.unitPrice * item.quantity)}</strong>
+                    </div>
+                  ))}
+                  <div className="account-order-total"><span>Order total</span><strong>{money(order.amount)}</strong></div>
+                  {["PendingPayment", "Failed", "CODPendingConfirmation", "CODConfirmed"].includes(order.status)
+                    && order.paymentStatus !== "partially_paid"
+                    && <button className="account-payment-link" onClick={() => navigate(`/checkout/success/${encodeURIComponent(order.orderNumber)}`)} type="button">
+                      {order.status === "Failed" ? "Retry payment / choose delivery ↗" : order.status === "CODConfirmed" ? "Convert COD to prepaid ↗" : "Choose payment method ↗"}
+                    </button>}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="account-no-orders"><p>Your order story starts with one good choice.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection ↗</button></div>
+          )}
+        </>
+      ) : (
+        <div className="account-login-layout">
+          <div className="account-login-note"><span>✳</span><h2>Your orders,<br /><em>all in one place.</em></h2><p>Sign in with your mobile number to see your order history. No password, no fuss.</p></div>
+          <form className="account-login-card" onSubmit={requested ? verifyCode : requestCode}>
+            <p className="store-eyebrow">{requested ? "02 / VERIFY IT’S YOU" : "01 / YOUR MOBILE NUMBER"}</p>
+            <h2>{requested ? "One little code." : "Welcome back."}</h2>
+            <label>Mobile number<input autoComplete="tel" disabled={requested} inputMode="numeric" maxLength="10" onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))} pattern="[0-9]{10}" required value={phone} placeholder="10-digit number" /></label>
+            {requested && <label>6-digit verification code<input autoComplete="one-time-code" inputMode="numeric" maxLength="6" onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} pattern="[0-9]{6}" required value={code} placeholder="Enter the code" /></label>}
+            <button className="store-button store-button-dark" disabled={busy} type="submit">{busy ? "Just a moment…" : requested ? "Verify & sign in" : "Send one-time code"} <span>↗</span></button>
+            {requested && <button className="account-change-number" onClick={() => { setRequested(false); setCode(""); setError(""); }} type="button">Change mobile number</button>}
+            <p className="account-privacy">One-time codes expire in 5 minutes and can only be used once.</p>
+          </form>
+        </div>
+      )}
+    </section>
   );
 }
 
 function CheckoutSuccess({ orderNumber, navigate }) {
-  return <section className="store-empty-page checkout-success"><span className="empty-bag-icon">✓</span><p className="store-eyebrow">CHECKOUT SAVED</p><h1>Your next signature<br /><em>is on its way.</em></h1><p>Order request <strong>{orderNumber}</strong> has been saved. Online payment will be available in Module 3.</p><button className="store-button store-button-dark" onClick={() => navigate("/account")} type="button">View your account <span>↗</span></button></section>;
+  const [summary, setSummary] = useState(null);
+  const [checkoutToken, setCheckoutToken] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [codConfirmed, setCodConfirmed] = useState(false);
+  const customerToken = window.localStorage.getItem(AUTH_KEY);
+
+  async function refreshOrder(token = checkoutToken) {
+    const result = await api.getPaymentSummary(
+      { orderNumber, ...(token ? { checkoutToken: token } : {}) },
+      customerToken,
+    );
+    setSummary(result);
+    return result;
+  }
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(CHECKOUT_ORDER_KEY) || "{}");
+      setCheckoutToken(saved.orderNumber === orderNumber ? saved.checkoutToken || "" : "");
+    } catch (storageError) {
+      console.error("Could not read this checkout’s local reference.", storageError);
+    }
+  }, [orderNumber]);
+
+  useEffect(() => {
+    if (!checkoutToken && !customerToken) return;
+    refreshOrder().catch((requestError) => setError(requestError.message));
+  }, [checkoutToken, customerToken, orderNumber]);
+
+  async function startOnlinePayment(mode) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const paymentOrder = await api.createRazorpayOrder({
+        orderNumber,
+        ...(checkoutToken ? { checkoutToken } : {}),
+        mode,
+      }, customerToken);
+      setSummary(paymentOrder.summary);
+      await loadRazorpayCheckout();
+      const checkout = new window.Razorpay({
+        key: paymentOrder.keyId,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: "Alpha Male",
+        description: mode === "partial_cod" ? "Partial COD deposit" : "Secure prepaid checkout",
+        order_id: paymentOrder.razorpayOrderId,
+        handler: async (gatewayResponse) => {
+          setBusy(true);
+          try {
+            const result = await api.verifyRazorpayPayment({
+              orderNumber,
+              ...(checkoutToken ? { checkoutToken } : {}),
+              razorpayOrderId: gatewayResponse.razorpay_order_id,
+              razorpayPaymentId: gatewayResponse.razorpay_payment_id,
+              razorpaySignature: gatewayResponse.razorpay_signature,
+            }, customerToken);
+            setSummary(result);
+            setNotice(result.paymentStatus === "partially_paid"
+              ? "Deposit confirmed. Your remaining balance is due on delivery."
+              : "Payment verified. Your order is confirmed.");
+          } catch (requestError) {
+            setError(requestError.message);
+          } finally {
+            setBusy(false);
+          }
+        },
+        modal: { ondismiss: () => setNotice("Payment was not completed. Your order is saved and you can retry.") },
+      });
+      checkout.on("payment.failed", (failure) => {
+        setNotice(failure.error?.description || "Payment failed. Your order is saved and you can retry.");
+      });
+      checkout.open();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmCod() {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await api.confirmCashOnDelivery({
+        orderNumber,
+        ...(checkoutToken ? { checkoutToken } : {}),
+        confirmed: codConfirmed,
+      }, customerToken);
+      setSummary(result);
+      setNotice("COD order confirmed. Please pay the delivery amount when it arrives.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canPayOnline = summary && ["PendingPayment", "Failed", "CODPendingConfirmation"].includes(summary.status);
+  const orderTotal = summary?.orderTotal ?? summary?.amount ?? 0;
+  const attemptPending = summary?.status === "PendingPayment"
+    && summary.paymentStatus === "created"
+    && ["prepaid", "partial_cod"].includes(summary.paymentMethod);
+  const onlineMode = attemptPending ? summary.paymentMethod : "prepaid";
+  const canConfirmCod = canPayOnline && !attemptPending && orderTotal <= summary.codLimit;
+  const partialCodAmount = summary ? Math.ceil((orderTotal * 25) / 100) : 0;
+  const canPartialCod = canPayOnline && !attemptPending && orderTotal - partialCodAmount <= summary.codLimit;
+  const isComplete = summary?.status === "Paid"
+    || (summary?.status === "CODConfirmed" && ["cod_pending", "partially_paid"].includes(summary.paymentStatus));
+
+  return (
+    <section className="store-section checkout-page checkout-success">
+      <p className="store-eyebrow"><span /> ORDER {isComplete ? "CONFIRMED" : "RECEIVED"}</p>
+      <h1 className="store-page-title">{isComplete ? <>It’s <em>official.</em></> : <>One last <em>choice.</em></>}</h1>
+      <p className="checkout-lede">Order reference <strong>{orderNumber}</strong></p>
+      {!summary && !error && <p className="payment-note">Loading your secure payment options…</p>}
+      {summary && <div className="payment-order-summary">
+        <div><span>Order total</span><strong>{money(summary.orderTotal)}</strong></div>
+        {summary.couponDiscount > 0 && <div><span>Coupon discount</span><strong>−{money(summary.couponDiscount)}</strong></div>}
+        {summary.prepaidDiscount > 0 && <div><span>Prepaid saving</span><strong>−{money(summary.prepaidDiscount)}</strong></div>}
+        {summary.amountPaid > 0 && <div><span>Paid online</span><strong>{money(summary.amountPaid)}</strong></div>}
+        {summary.codDue > 0 && <div><span>Due on delivery</span><strong>{money(summary.codDue)}</strong></div>}
+        <div><span>Order status</span><strong>{summary.status}</strong></div>
+      </div>}
+      {notice && <p className="account-notice" role="status">{notice}</p>}
+      {error && <p className="store-error" role="alert">{error}</p>}
+      {canPayOnline && <div className="payment-choice-list">
+        <article><div><strong>{attemptPending && onlineMode === "partial_cod" ? "Continue deposit payment" : "Pay online"}</strong><span>{onlineMode === "partial_cod" ? `Pay ${money(summary.paymentAmount)} now; ${money(summary.codDue)} COD` : "Secure Razorpay checkout · save 5% prepaid"}</span></div><button className="store-button store-button-dark" disabled={busy} onClick={() => startOnlinePayment(onlineMode)} type="button">{busy ? "Please wait…" : attemptPending ? "Retry payment" : `Pay ${money(orderTotal - Math.floor(orderTotal * 0.05))}`} ↗</button></article>
+        {canPartialCod && <article><div><strong>Pay a deposit, rest on delivery</strong><span>Pay {money(partialCodAmount)} now; {money(orderTotal - partialCodAmount)} COD</span></div><button className="store-button store-button-outline" disabled={busy} onClick={() => startOnlinePayment("partial_cod")} type="button">Choose partial COD ↗</button></article>}
+        {canConfirmCod && <article className="cod-choice"><div><strong>Cash on delivery</strong><span>COD is available for orders up to {money(summary.codLimit)}.</span></div><label><input checked={codConfirmed} onChange={(event) => setCodConfirmed(event.target.checked)} type="checkbox" /> I confirm I’ll pay on delivery.</label><button className="store-button store-button-outline" disabled={busy || !codConfirmed} onClick={confirmCod} type="button">Confirm COD ↗</button></article>}
+        {!canConfirmCod && !canPartialCod && <p className="payment-note">This order is above the COD limit. Choose prepaid checkout.</p>}
+      </div>}
+      {isComplete && <div className="payment-complete">
+        <span className="empty-bag-icon">✓</span>
+        <p>{summary.status === "Paid" ? "Payment verified. Your order is confirmed." : summary.paymentStatus === "partially_paid" ? "Your deposit is confirmed; the balance is due on delivery." : "Your COD order is confirmed."}</p>
+        {summary.status === "CODConfirmed" && summary.paymentStatus === "cod_pending" && <button className="store-button store-button-dark" disabled={busy} onClick={() => startOnlinePayment("prepaid")} type="button">Convert COD to prepaid · save 5% ↗</button>}
+      </div>}
+      <button className="store-button store-button-outline" onClick={() => navigate("/account")} type="button">View your account <span>↗</span></button>
+      <p className="checkout-disclaimer">Stock is reduced once payment succeeds or COD is confirmed. Online orders are processed in Razorpay test mode.</p>
+    </section>
+  );
 }
 
 export default function Storefront({ path, cart, setCart, navigate }) {

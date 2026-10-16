@@ -31,6 +31,30 @@ export const api = {
       body: JSON.stringify(order),
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     }),
+  getPaymentSummary: (order, token) =>
+    request("/payments/order-details", {
+      method: "POST",
+      body: JSON.stringify(order),
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }),
+  createRazorpayOrder: (order, token) =>
+    request("/payments/razorpay/order", {
+      method: "POST",
+      body: JSON.stringify(order),
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }),
+  verifyRazorpayPayment: (payment, token) =>
+    request("/payments/razorpay/verify", {
+      method: "POST",
+      body: JSON.stringify(payment),
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }),
+  confirmCashOnDelivery: (order, token) =>
+    request("/payments/cod/confirm", {
+      method: "POST",
+      body: JSON.stringify(order),
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }),
   getAdminCoupons: () => request("/admin/coupons"),
   saveAdminCoupon: (coupon, id) =>
     request(id ? `/admin/coupons/${id}` : "/admin/coupons", {

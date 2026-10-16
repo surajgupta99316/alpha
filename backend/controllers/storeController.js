@@ -213,7 +213,7 @@ export async function getMyOrders(req, res) {
   const orders = await Order.find({ "customer.id": req.customer._id })
     .sort({ createdAt: -1 })
     .limit(100)
-    .select("orderNumber items product amount subtotal discount shipping couponCode status createdAt")
+    .select("orderNumber items product amount subtotal discount shipping couponCode status paymentMethod paymentStatus paymentAmount amountPaid codDue createdAt")
     .lean();
   res.json(orders);
 }
@@ -356,7 +356,8 @@ export async function createCheckoutOrder(req, res) {
       discount,
       shipping,
       amount: order.amount,
-      message: "Checkout saved. Payment will be available in the next module.",
+      checkoutToken,
+      message: "Checkout saved. Choose how you’d like to pay.",
     });
   } catch (error) {
     if (coupon) await Coupon.updateOne({ _id: coupon._id, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });

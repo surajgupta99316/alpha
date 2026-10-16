@@ -241,6 +241,20 @@
 .account-order-item, .account-order-total { display: flex; justify-content: space-between; gap: 14px; padding-top: 11px; font-size: 9px; }
 .account-order-total { margin-top: 10px; padding-top: 13px; border-top: 1px solid var(--store-line); font-size: 10px; }
 .account-no-orders { padding: 30px 0; color: var(--store-muted); font-size: 11px; }
+.payment-order-summary { width: min(100%, 560px); margin: 20px auto; padding: 19px 22px; background: #eeece4; text-align: left; }
+.payment-order-summary > div { display: flex; justify-content: space-between; gap: 15px; padding: 9px 0; border-bottom: 1px solid #d4d3ca; font-size: 10px; }
+.payment-order-summary > div:last-child { border-bottom: 0; }
+.payment-choice-list { width: min(100%, 720px); display: grid; gap: 12px; margin: 25px auto; text-align: left; }
+.payment-choice-list > article { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px; border: 1px solid var(--store-line); }
+.payment-choice-list > article > div { display: flex; flex-direction: column; gap: 7px; }
+.payment-choice-list > article > div strong { font-family: "Playfair Display", Georgia, serif; font-size: 17px; font-weight: 500; }
+.payment-choice-list > article > div span { color: var(--store-muted); font-size: 9px; line-height: 1.5; }
+.payment-choice-list .cod-choice { display: grid; grid-template-columns: 1fr auto; }
+.cod-choice > label { grid-column: 1; display: flex; align-items: center; gap: 8px; color: var(--store-muted); font-size: 9px; }
+.cod-choice > button { grid-column: 2; grid-row: 1 / span 2; }
+.payment-complete { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 25px auto; }
+.payment-complete > p { color: #536723; font-size: 12px; }
+.account-payment-link { margin-top: 14px; padding: 0; border: 0; border-bottom: 1px solid #aaa99f; background: transparent; cursor: pointer; font-size: 9px; }
 
 @media (max-width: 900px) {
   .store-product-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 22px 14px; }
@@ -327,6 +341,9 @@
   .account-welcome { gap: 10px; }
   .account-order-top { flex-wrap: wrap; gap: 8px 12px; }
   .account-order-status { margin-left: 0; }
+  .payment-choice-list > article { align-items: stretch; flex-direction: column; }
+  .payment-choice-list .cod-choice { display: flex; }
+  .cod-choice > button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

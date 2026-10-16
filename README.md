@@ -1,4 +1,4 @@
-# Alpha Male D2C — Modules 1 and 2
+# Alpha Male D2C — Modules 1, 2, and 3
 
 Modules 1 and 2 of the Alpha Male MERN assignment: an admin-managed campaign landing page and order-request form, plus a four-product storefront, pincode serviceability, cart, coupon management, checkout, and customer OTP sign-in.
 
@@ -69,11 +69,13 @@ OTP codes expire after five minutes, allow at most five verification attempts, a
 
 Keep Twilio credentials server-side: do not use a `VITE_` prefix and do not commit `.env`. For production, set a persistent random `AUTH_TOKEN_SECRET` of at least 32 characters.
 
-### Checkout and security boundaries
+### Checkout, payments, and security boundaries
 
-The checkout API recalculates product prices, discounts, and shipping using MongoDB; browser totals are previews only. Pincode and stock are validated on the backend. Orders are saved as `PendingPayment`; checkout does not charge or collect payment. Payment processing is for Module 3.
+The checkout API recalculates product prices, discounts, and shipping using MongoDB; browser totals are previews only. Pincode and stock are validated on the backend. Payment uses Razorpay test mode. Add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` to the ignored root `.env`, then restart the API. The backend creates the Razorpay order using the saved server-calculated order total and verifies checkout signatures before confirming online payments. Configure the Razorpay webhook URL as `https://<your-public-api-host>/api/payments/webhook`, subscribe to `payment.captured` and `payment.failed`, and use the same webhook secret in `.env`. Razorpay cannot deliver webhooks to localhost; use a secure public development tunnel for testing and never expose the key secret in frontend variables.
 
-Admin routes are unauthenticated for this local assignment. Add admin authentication and role checks before exposing the API publicly. Customer login sessions are bearer tokens; the frontend stores its token in local storage.
+Cash on delivery is explicitly confirmed and limited to ₹3,000. Inventory is decremented once, only after payment verification or COD confirmation. Failed payments stay retryable. Online prepaid orders receive a 5% server-calculated discount; partial COD takes a 25% online deposit when the remaining COD balance is within the limit, and a confirmed COD order can be converted to prepaid from its confirmation page. Payment keys are blank in `.env.example`; add your own Razorpay test credentials locally.
+
+Admin routes are unauthenticated for this local assignment. Add admin authentication and role checks before exposing the API publicly. Customer login sessions are bearer tokens; the frontend stores its token in local storage. The Razorpay webhook is independently authenticated with its HMAC signature.
 
 ## API routes
 
@@ -86,6 +88,10 @@ Admin routes are unauthenticated for this local assignment. Add admin authentica
 - `GET /api/serviceability/:code`
 - `GET /api/coupons`, `POST /api/coupons/validate`
 - `POST /api/store/checkout`
+- `POST /api/payments/order-details`
+- `POST /api/payments/razorpay/order`, `POST /api/payments/razorpay/verify`
+- `POST /api/payments/cod/confirm`
+- `POST /api/payments/webhook` — Razorpay signed raw-body webhook
 - `POST /api/auth/otp/request`, `POST /api/auth/otp/verify`
 - `GET /api/auth/me`, `GET /api/auth/orders`
 - `GET /api/admin/coupons`, `POST /api/admin/coupons`, `PUT /api/admin/coupons/:id`
@@ -97,3 +103,7 @@ npm run build
 ```
 
 The production frontend build is written to `frontend/dist`.
+
+## Module 3 payment check
+
+Use Razorpay **test** keys only. Place a checkout order and choose prepaid, partial COD, or COD confirmation on the order confirmation page. Razorpay checkout opens in test mode; use a test payment method from your Razorpay test account. The backend confirms the payment signature and inventory change. For webhook checks, point a test endpoint at `/api/payments/webhook`, subscribe to `payment.captured` and `payment.failed`, and use the matching webhook secret. COD is capped at ₹3,000, requires an explicit confirmation, and can be converted to prepaid before delivery.
