@@ -3,6 +3,16 @@ import HttpError from "../utils/HttpError.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import { sendOrderNotification } from "../utils/orderNotifications.js";
+import { markAbandonedCartConverted } from "./crmController.js";
+
+async function markCheckoutConverted(order) {
+  await markAbandonedCartConverted(order._id).catch((error) => {
+    console.error("Could not mark the abandoned checkout as converted.", {
+      orderNumber: order.orderNumber,
+      error: error.message,
+    });
+  });
+}
 
 const COD_LIMIT = 3000;
 const PREPAID_DISCOUNT_PERCENT = 5;
@@ -44,7 +54,7 @@ async function findOrder(req, body) {
     }
     filter.checkoutToken = checkoutToken;
   }
-  const order = await Order.findOne(filter);
+  const order = await Order.findOne(filter).populate("landingPage", "slug");
   if (!order) throw new HttpError(404, "This order was not found.");
   if (!order.items.length) throw new HttpError(400, "This legacy order cannot be paid through checkout.");
   return order;
@@ -67,6 +77,14 @@ function paymentSummary(order) {
     codDue: order.codDue || 0,
     codLimit: COD_LIMIT,
     refundStatus: order.refundStatus || "not_required",
+    items: (order.items || []).map((item) => ({
+      item_id: item.product?.toString() || "",
+      item_name: item.name,
+      price: item.unitPrice,
+      quantity: item.quantity,
+    })),
+    headlineVariant: order.headlineVariant || "",
+    campaign: order.landingPage?.slug || order.utm?.campaign || "",
   };
 }
 
@@ -309,6 +327,7 @@ export async function verifyRazorpayPayment(req, res) {
     return res.json(paymentSummary(order));
   }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
+    await markCheckoutConverted(order);
     await sendOrderNotification(order, "order_placed").catch((error) => {
       console.error("Could not record the order-placed notification.", {
         orderNumber: order.orderNumber,
@@ -325,6 +344,7 @@ export async function verifyRazorpayPayment(req, res) {
     razorpaySignature: signature,
     amountPaid: order.paymentAmount,
   });
+  await markCheckoutConverted(settled);
   await sendOrderNotification(settled, "order_placed").catch((error) => {
     console.error("Could not record the order-placed notification.", {
       orderNumber: settled.orderNumber,
@@ -340,6 +360,7 @@ export async function confirmCashOnDelivery(req, res) {
     throw new HttpError(409, "This order was cancelled and cannot be confirmed for COD.");
   }
   if (order.status === "CODConfirmed") {
+    await markCheckoutConverted(order);
     await sendOrderNotification(order, "order_placed").catch((error) => {
       console.error("Could not record the order-placed notification.", {
         orderNumber: order.orderNumber,
@@ -377,6 +398,7 @@ export async function confirmCashOnDelivery(req, res) {
     order.codDue = total;
     order.codConversionPending = false;
     await order.save();
+    await markCheckoutConverted(order);
     return res.json(paymentSummary(order));
   }
   order.paymentMethod = "cod";
@@ -392,6 +414,7 @@ export async function confirmCashOnDelivery(req, res) {
     amountPaid: 0,
     codDue: total,
   });
+  await markCheckoutConverted(settled);
   await sendOrderNotification(settled, "order_placed").catch((error) => {
     console.error("Could not record the order-placed notification.", {
       orderNumber: settled.orderNumber,
@@ -456,6 +479,7 @@ export async function handleRazorpayWebhook(req, res) {
     return res.json({ received: true, processed: true, refundPending: true });
   }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
+    await markCheckoutConverted(order);
     await sendOrderNotification(order, "order_placed").catch((error) => {
       console.error("Could not record the order-placed notification.", {
         orderNumber: order.orderNumber,
@@ -471,6 +495,7 @@ export async function handleRazorpayWebhook(req, res) {
     razorpayPaymentId: payment.id,
     amountPaid: order.paymentAmount,
   });
+  await markCheckoutConverted(settled);
   await sendOrderNotification(settled, "order_placed").catch((error) => {
     console.error("Could not record the order-placed notification.", {
       orderNumber: settled.orderNumber,

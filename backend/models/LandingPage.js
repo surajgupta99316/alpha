@@ -29,6 +29,7 @@ const landingPageSchema = new mongoose.Schema(
       match: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
     },
     headline: { type: String, required: true, trim: true, maxlength: 120 },
+    variantHeadline: { type: String, trim: true, maxlength: 120, default: "" },
     subheadline: { type: String, required: true, trim: true, maxlength: 240 },
     heroImage: { type: String, required: true, trim: true },
     offerText: { type: String, required: true, trim: true, maxlength: 180 },

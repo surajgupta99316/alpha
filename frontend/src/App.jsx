@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { captureFirstTouch } from "./attribution.js";
 import Storefront from "./Storefront.jsx";
 import CouponAdmin from "./CouponAdmin.jsx";
 import FulfilmentAdmin from "./FulfilmentAdmin.jsx";
 import { PostPurchaseAdmin } from "./PostPurchase.jsx";
+import CRMAdmin, { StaffGate } from "./CRMAdmin.jsx";
+import { getExperimentVisitorId, getHeadlineVariant, trackCommerceEvent, trackPageView } from "./analytics.js";
+import { updateSeoMetadata } from "./seo.js";
 
 const emptyForm = {
   productId: "",
   slug: "",
   headline: "",
+  variantHeadline: "",
   subheadline: "",
   heroImage: "",
   offerText: "",
@@ -36,6 +40,9 @@ function usePath() {
 
 export default function App() {
   const [path, navigate] = usePath();
+  useEffect(() => {
+    trackPageView(path);
+  }, [path]);
   const [cart, setCart] = useState(() => {
     try {
       const saved = JSON.parse(window.localStorage.getItem("alpha:cart") || "[]");
@@ -58,11 +65,20 @@ export default function App() {
     }
   }, [cart]);
   if (path === "/admin" || path.startsWith("/admin/")) {
-    if (path === "/admin/fulfilment" || path === "/admin/orders") return <FulfilmentAdmin navigate={navigate} />;
-    if (path === "/admin/returns") return <PostPurchaseAdmin mode="returns" navigate={navigate} />;
-    if (path === "/admin/support") return <PostPurchaseAdmin mode="support" navigate={navigate} />;
-    if (path === "/admin/coupons") return <CouponAdmin navigate={navigate} />;
-    return <Admin navigate={navigate} />;
+    let screen;
+    if (path === "/admin/fulfilment" || path === "/admin/orders") screen = <FulfilmentAdmin navigate={navigate} />;
+    else if (path === "/admin/returns") screen = <PostPurchaseAdmin mode="returns" navigate={navigate} />;
+    else if (path === "/admin/support") screen = <PostPurchaseAdmin mode="support" navigate={navigate} />;
+    else if (path === "/admin/coupons") screen = <CouponAdmin navigate={navigate} />;
+    else if (path === "/admin/crm") screen = <CRMAdmin mode="customers" navigate={navigate} />;
+    else if (path === "/admin/leads") screen = <CRMAdmin mode="leads" navigate={navigate} />;
+    else if (path === "/admin/abandoned-carts") screen = <CRMAdmin mode="carts" navigate={navigate} />;
+    else if (path === "/admin/analytics") screen = <CRMAdmin mode="analytics" navigate={navigate} />;
+    else if (path === "/admin/products") screen = <CRMAdmin mode="products" navigate={navigate} />;
+    else if (path === "/admin/reviews") screen = <CRMAdmin mode="reviews" navigate={navigate} />;
+    else if (path === "/admin/staff") screen = <CRMAdmin mode="staff" navigate={navigate} />;
+    else screen = <Admin navigate={navigate} />;
+    return <StaffGate path={path} navigate={navigate}>{screen}</StaffGate>;
   }
   if (path.startsWith("/lp/")) {
     const slug = decodeURIComponent(path.slice(4));
@@ -72,9 +88,11 @@ export default function App() {
 }
 
 function CampaignPage({ slug }) {
+  const trackedCampaignView = useRef("");
   const [page, setPage] = useState(null);
   const [error, setError] = useState("");
   const [attribution] = useState(() => captureFirstTouch(window.location.search, window.localStorage));
+  const [headlineTest, setHeadlineTest] = useState({ variant: "A", headline: "" });
   const [form, setForm] = useState({ fullName: "", phone: "", email: "", address: "" });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
@@ -83,10 +101,32 @@ function CampaignPage({ slug }) {
     api
       .getLandingPage(slug)
       .then((data) => {
+        if (trackedCampaignView.current === slug) return;
+        trackedCampaignView.current = slug;
+        const assignment = getHeadlineVariant(data.slug, data.variantHeadline, window.location.search, window.localStorage);
+        setHeadlineTest(assignment);
         setPage(data);
-        document.title = `${data.product.name} | Alpha Male`;
-        const description = document.querySelector('meta[name="description"]');
-        if (description) description.content = data.subheadline;
+        if (data.variantHeadline && !assignment.overridden) {
+          const visitorId = getExperimentVisitorId(window.localStorage);
+          if (visitorId) {
+            api.recordHeadlineExposure({ slug: data.slug, variant: assignment.variant, visitorId })
+              .catch((requestError) => console.error("Could not record the campaign headline-test exposure.", requestError));
+          }
+        }
+        updateSeoMetadata({
+          title: `${data.product.name} | Alpha Male`,
+          description: data.subheadline,
+          image: data.heroImage,
+          url: window.location.href,
+        });
+        trackCommerceEvent("view_item", {
+          id: data.product._id,
+          name: data.product.name,
+          price: data.product.price,
+          campaign: data.slug,
+          variant: assignment.variant,
+          content_type: "product",
+        });
       })
       .catch((requestError) => setError(requestError.message));
   }, [slug]);
@@ -100,7 +140,20 @@ function CampaignPage({ slug }) {
     setError("");
     setSubmitting(true);
     try {
-      const result = await api.createOrder({ ...form, slug, utm: attribution });
+      trackCommerceEvent("begin_checkout", {
+        id: page.product._id,
+        name: page.product.name,
+        price: page.product.price,
+        campaign: slug,
+        variant: headlineTest.variant,
+      });
+      const result = await api.createOrder({
+        ...form,
+        slug,
+        utm: attribution,
+        headlineVariant: headlineTest.variant,
+        experimentVisitorId: headlineTest.overridden ? "" : getExperimentVisitorId(window.localStorage),
+      });
       setSuccess(result.orderNumber);
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     } catch (requestError) {
@@ -119,13 +172,13 @@ function CampaignPage({ slug }) {
       <header className="site-header">
         <a className="wordmark" href="/" aria-label="Alpha Male home">ALPHA<span>MALE</span></a>
         <span className="header-note">OWN YOUR EVERYDAY</span>
-        <a className="header-link" href="#order">Get Alpha Bold <span aria-hidden="true">↗</span></a>
+        <a className="header-link" href="#order">Get {product.name} <span aria-hidden="true">↗</span></a>
       </header>
 
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow"><span className="eyebrow-dot" /> THE SIGNATURE COLLECTION</p>
-          <h1>{page.headline}</h1>
+          <h1>{headlineTest.headline || page.headline}</h1>
           <p className="hero-description">{page.subheadline}</p>
           <div className="hero-offer">{page.offerText}</div>
           <div className="hero-actions">
@@ -344,6 +397,7 @@ function Admin({ navigate }) {
       productId: page.product?._id || page.product,
       slug: page.slug,
       headline: page.headline,
+      variantHeadline: page.variantHeadline || "",
       subheadline: page.subheadline,
       heroImage: page.heroImage,
       offerText: page.offerText,
@@ -394,6 +448,12 @@ function Admin({ navigate }) {
         <a className="wordmark" href="/" onClick={(event) => { event.preventDefault(); navigate("/"); }}>ALPHA<span>MALE</span></a>
         <div className="admin-title"><span>CAMPAIGN STUDIO</span><strong>Module 01 · Acquire</strong></div>
         <div className="admin-header-links">
+          <a className="admin-preview-link" href="/admin/crm" onClick={(event) => { event.preventDefault(); navigate("/admin/crm"); }}>Customers</a>
+          <a className="admin-preview-link" href="/admin/leads" onClick={(event) => { event.preventDefault(); navigate("/admin/leads"); }}>Leads</a>
+          <a className="admin-preview-link" href="/admin/analytics" onClick={(event) => { event.preventDefault(); navigate("/admin/analytics"); }}>Analytics</a>
+          <a className="admin-preview-link" href="/admin/products" onClick={(event) => { event.preventDefault(); navigate("/admin/products"); }}>Products</a>
+          <a className="admin-preview-link" href="/admin/reviews" onClick={(event) => { event.preventDefault(); navigate("/admin/reviews"); }}>Reviews</a>
+          <a className="admin-preview-link" href="/admin/staff" onClick={(event) => { event.preventDefault(); navigate("/admin/staff"); }}>Staff</a>
           <a className="admin-preview-link" href="/admin/fulfilment" onClick={(event) => { event.preventDefault(); navigate("/admin/fulfilment"); }}>Fulfilment</a>
           <a className="admin-preview-link" href="/admin/returns" onClick={(event) => { event.preventDefault(); navigate("/admin/returns"); }}>Returns</a>
           <a className="admin-preview-link" href="/admin/support" onClick={(event) => { event.preventDefault(); navigate("/admin/support"); }}>Support</a>
@@ -439,6 +499,8 @@ function Admin({ navigate }) {
                 <label>Offer text<input maxLength="180" name="offerText" onChange={updateField} required value={form.offerText} placeholder="Launch offer: save 20% today" /></label>
               </div>
               <label>Headline<input maxLength="120" name="headline" onChange={updateField} required value={form.headline} placeholder="Make your presence unforgettable." /></label>
+              <label>Headline test · Variant B<input maxLength="120" name="variantHeadline" onChange={updateField} value={form.variantHeadline} placeholder="Try a distinct alternative headline (optional)" /><small>Visitors are randomly split 50/50 and retain the same headline on this browser. Use ?ab_variant=A or ?ab_variant=B to preview a variant.</small></label>
+              {form.slug && <div className="campaign-preview-tools"><a href={`${(import.meta.env.VITE_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "")}/api/campaign-preview/${encodeURIComponent(form.slug)}`} rel="noreferrer" target="_blank">Open social preview ↗</a>{form.variantHeadline && <a href={`${(import.meta.env.VITE_PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "")}/api/campaign-preview/${encodeURIComponent(form.slug)}?ab_variant=B`} rel="noreferrer" target="_blank">Social preview B</a>}<a href={`/lp/${encodeURIComponent(form.slug)}?ab_variant=A`} rel="noreferrer" target="_blank">Preview A</a>{form.variantHeadline && <a href={`/lp/${encodeURIComponent(form.slug)}?ab_variant=B`} rel="noreferrer" target="_blank">Preview B</a>}</div>}
               <label>Supporting copy<textarea maxLength="240" name="subheadline" onChange={updateField} required rows="2" value={form.subheadline} placeholder="A line that brings your campaign to life." /></label>
               <label>Banner image URL<input name="heroImage" onChange={updateField} required type="url" value={form.heroImage} placeholder="https://…" /></label>
               <div className="admin-form-row">

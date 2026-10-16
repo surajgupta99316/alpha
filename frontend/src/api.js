@@ -1,8 +1,10 @@
 async function request(path, options = {}) {
+  const staffToken = window.localStorage.getItem("alpha:staff-token");
   const response = await fetch(`/api${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(path.startsWith("/admin/") && staffToken ? { Authorization: `Bearer ${staffToken}` } : {}),
       ...options.headers,
     },
   });
@@ -12,21 +14,50 @@ async function request(path, options = {}) {
 }
 
 async function download(path, options = {}) {
+  const staffToken = window.localStorage.getItem("alpha:staff-token");
   const response = await fetch(`/api${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(path.startsWith("/admin/") && staffToken ? { Authorization: `Bearer ${staffToken}` } : {}),
       ...options.headers,
     },
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || "The PDF could not be generated.");
+    throw new Error(payload.error || "The download could not be completed.");
   }
   return response.blob();
 }
 
 export const api = {
+  loginStaff: (credentials) => request("/staff/login", { method: "POST", body: JSON.stringify(credentials) }),
+  getStaffMe: () => request("/staff/me", { headers: { Authorization: `Bearer ${window.localStorage.getItem("alpha:staff-token") || ""}` } }),
+  getCrmDashboard: (filters = {}) => request(`/admin/crm/dashboard?${new URLSearchParams(filters)}`),
+  getCrmCustomers: (search = "", segment = "") => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (segment) params.set("segment", segment);
+    return request(`/admin/crm/customers${params.size ? `?${params}` : ""}`);
+  },
+  getCustomer360: (id) => request(`/admin/crm/customers/${encodeURIComponent(id)}`),
+  updateCustomerCrm: (id, update) => request(`/admin/crm/customers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(update) }),
+  getCustomerSegments: () => request("/admin/crm/segments"),
+  getLeads: () => request("/admin/crm/leads"),
+  updateLead: (id, update) => request(`/admin/crm/leads/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(update) }),
+  getAbandonedCarts: () => request("/admin/crm/abandoned-carts"),
+  updateAbandonedCart: (id, status) => request(`/admin/crm/abandoned-carts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  getReviews: () => request("/admin/crm/reviews"),
+  moderateReview: (id, status, moderationNote = "") => request(`/admin/crm/reviews/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status, moderationNote }) }),
+  getCrmProducts: () => request("/admin/crm/products"),
+  saveCrmProduct: (product, id) => request(id ? `/admin/crm/products/${encodeURIComponent(id)}` : "/admin/crm/products", { method: id ? "PUT" : "POST", body: JSON.stringify(product) }),
+  getStaffUsers: () => request("/admin/staff"),
+  createStaffUser: (staff) => request("/admin/staff", { method: "POST", body: JSON.stringify(staff) }),
+  setStaffActive: (id, active) => request(`/admin/staff/${encodeURIComponent(id)}/active`, { method: "PATCH", body: JSON.stringify({ active }) }),
+  exportCsv: (type) => download(`/admin/export/${encodeURIComponent(type)}.csv`),
+  createLead: (lead) => request("/leads", { method: "POST", body: JSON.stringify(lead) }),
+  getProductReviews: (slug) => request(`/reviews/products/${encodeURIComponent(slug)}`),
+  submitProductReview: (review) => request("/reviews", { method: "POST", body: JSON.stringify(review) }),
   getProducts: () => request("/products"),
   getStoreProducts: (params = {}) => request(`/store/products?${new URLSearchParams(params)}`),
   getStoreProduct: (slug) => request(`/store/products/${encodeURIComponent(slug)}`),
@@ -100,6 +131,8 @@ export const api = {
       body: JSON.stringify(coupon),
     }),
   getLandingPage: (slug) => request(`/landing-pages/${encodeURIComponent(slug)}`),
+  recordHeadlineExposure: (exposure) =>
+    request("/campaign-experiments/exposure", { method: "POST", body: JSON.stringify(exposure) }),
   getAdminPages: () => request("/admin/landing-pages"),
   saveLandingPage: (page, id) =>
     request(id ? `/admin/landing-pages/${id}` : "/admin/landing-pages", {

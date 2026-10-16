@@ -100,12 +100,17 @@ const orderSchema = new mongoose.Schema(
     amountRefunded: { type: Number, min: 0, default: 0 },
     returnRequestLock: { type: String, select: false },
     returnWorkflowLock: { type: String, select: false },
+    loyaltyAwardedAt: { type: Date },
+    loyaltyAwardLock: { type: String, select: false },
+    loyaltyAwardLockAt: { type: Date, select: false },
     codConversionPending: { type: Boolean, default: false },
     utm: {
       source: { type: String, trim: true, maxlength: 200 },
       medium: { type: String, trim: true, maxlength: 200 },
       campaign: { type: String, trim: true, maxlength: 200 },
     },
+    headlineVariant: { type: String, enum: ["A", "B"] },
+    experimentVisitorId: { type: String, trim: true, maxlength: 36, match: /^[0-9a-f-]{36}$/i },
   },
   { timestamps: true },
 );

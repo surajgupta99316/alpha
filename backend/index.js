@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { connectDatabase } from "./config/database.js";
 import { handleCourierWebhook } from "./controllers/fulfilmentController.js";
 import { handleRazorpayWebhook } from "./controllers/paymentController.js";
+import { processAbandonedCartEmails } from "./controllers/crmController.js";
 import apiRouter from "./routes/api.js";
 import { seedDatabase } from "./seed.js";
 
@@ -61,6 +62,12 @@ try {
     server.once("error", reject);
     server.listen(port, resolve);
   });
+  const abandonedCartTimer = setInterval(() => {
+    processAbandonedCartEmails().catch((error) => {
+      console.error("Abandoned-cart email worker failed.", error);
+    });
+  }, 60_000);
+  abandonedCartTimer.unref();
   console.log(`Alpha Male API listening on http://localhost:${port}`);
 } catch (error) {
   if (error.code === "EADDRINUSE") {

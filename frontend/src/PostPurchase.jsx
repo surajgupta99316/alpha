@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
+import { captureFirstTouch } from "./attribution.js";
 import "./postpurchase.css";
 
 const money = (amount) => `₹${Number(amount || 0).toLocaleString("en-IN")}`;
@@ -164,10 +165,39 @@ export function TrackingPage() {
           : <span className="post-muted">Mock shipment — courier tracking link unavailable</span>}</div>}
         <StatusTimeline entries={lookup.order.statusTimeline} />
         <div className="post-order-items"><h3>Items</h3>{lookup.order.items.map((item, index) => <p key={`${item.name}-${index}`}><span>{item.name}</span><strong>× {item.quantity}</strong></p>)}</div>
+        {lookup.order.fulfillmentStatus === "Delivered" && lookup.order.items.map((item, index) => item.product && <ReviewForm key={`${item.product}-${index}`} credentials={lookup.credentials} item={item} orderNumber={lookup.order.orderNumber} />)}
         {lookup.order.return.eligible && <ReturnForm credentials={lookup.credentials} order={lookup.order} />}
       </div>}
     </section>
   );
+}
+
+function ReviewForm({ credentials, item, orderNumber }) {
+  const [rating, setRating] = useState("5");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await api.submitProductReview({
+        orderNumber,
+        phone: credentials.phone,
+        productId: item.product,
+        rating: Number(rating),
+        title,
+        body,
+      });
+      setNotice(result.message);
+      setBody("");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally { setBusy(false); }
+  }
+  return <form className="post-form post-review-form" onSubmit={submit}><h3>Review {item.name}</h3><p className="post-muted">Only delivered purchases can be reviewed. Reviews appear after moderation.</p><label>Rating<select onChange={(event) => setRating(event.target.value)} value={rating}>{[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} / 5</option>)}</select></label><label>Title (optional)<input maxLength="100" onChange={(event) => setTitle(event.target.value)} value={title} /></label><label>Your review<textarea maxLength="1500" onChange={(event) => setBody(event.target.value)} required rows="3" value={body} /></label>{error && <p className="post-error" role="alert">{error}</p>}{notice && <p className="post-notice" role="status">{notice}</p>}<button className="post-button" disabled={busy} type="submit">{busy ? "Submitting…" : "Submit review"} ↗</button></form>;
 }
 
 export function SupportPage() {
@@ -206,8 +236,29 @@ export function SupportPage() {
         {notice && <p className="post-notice post-wide" role="status">{notice}</p>}
         <button className="post-button post-wide" disabled={busy} type="submit">{busy ? "Sending…" : "Create support ticket"} ↗</button>
       </form>
+      <CallbackRequestForm />
     </section>
   );
+}
+
+function CallbackRequestForm() {
+  const [form, setForm] = useState({ fullName: "", phone: "", email: "", message: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  async function submit(event) {
+    event.preventDefault(); setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await api.createLead({
+        ...form,
+        utm: captureFirstTouch(window.location.search, window.localStorage),
+      });
+      setNotice(result.message);
+      setForm({ fullName: "", phone: "", email: "", message: "" });
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="post-callback"><p className="post-eyebrow">CALLBACK REQUEST</p><h2>Want us to <em>call you?</em></h2><form className="post-form post-support-form" onSubmit={submit}><label>Full name<input maxLength="100" onChange={(event) => setForm({ ...form, fullName: event.target.value })} required value={form.fullName} /></label><label>Mobile number<input inputMode="numeric" maxLength="10" onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, "").slice(0, 10) })} required value={form.phone} /></label><label>Email (optional)<input maxLength="254" onChange={(event) => setForm({ ...form, email: event.target.value })} type="email" value={form.email} /></label><label className="post-wide">What would you like to discuss? <textarea maxLength="1000" onChange={(event) => setForm({ ...form, message: event.target.value })} rows="3" value={form.message} /></label>{error && <p className="post-error post-wide" role="alert">{error}</p>}{notice && <p className="post-notice post-wide" role="status">{notice}</p>}<button className="post-button post-wide" disabled={busy} type="submit">{busy ? "Sending…" : "Request a callback"} ↗</button></form></div>;
 }
 
 function AdminHeader({ navigate }) {

@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api.js";
+import { captureFirstTouch } from "./attribution.js";
+import { trackCommerceEvent, trackPurchaseOnce } from "./analytics.js";
+import { updateSeoMetadata } from "./seo.js";
 import { SupportPage, TrackingPage } from "./PostPurchase.jsx";
 
 const FREE_SHIPPING_THRESHOLD = 1499;
@@ -135,13 +138,33 @@ function PincodeCheck({ value, onChange }) {
 }
 
 function ProductDetail({ slug, navigate, addToCart }) {
+  const trackedProductView = useRef("");
   const [product, setProduct] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [pincode, setPincode] = useState("");
   const [added, setAdded] = useState(false);
   useEffect(() => {
-    api.getStoreProduct(slug).then(setProduct).catch((requestError) => setError(requestError.message));
+    api.getStoreProduct(slug).then((result) => {
+      setProduct(result);
+      updateSeoMetadata({
+        title: `${result.name} | Alpha Male`,
+        description: result.description,
+        image: result.imageUrl,
+        url: window.location.href,
+      });
+      if (trackedProductView.current !== result._id) {
+        trackedProductView.current = result._id;
+        trackCommerceEvent("view_item", {
+          id: result._id,
+          name: result.name,
+          price: result.price,
+          content_type: "product",
+        });
+      }
+    }).catch((requestError) => setError(requestError.message));
+    api.getProductReviews(slug).then(setReviews).catch((requestError) => console.error("Could not load product reviews.", requestError));
   }, [slug]);
   if (error) return <div className="store-error-screen"><h1>{error}</h1><a href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>Back to the collection ↗</a></div>;
   if (!product) return <div className="store-loading">Finding your signature…</div>;
@@ -157,6 +180,7 @@ function ProductDetail({ slug, navigate, addToCart }) {
         <div className="store-detail-image"><img src={product.imageUrl} alt={product.name} fetchpriority="high" /><span>{product.category}</span></div>
         <div className="store-detail-copy"><p className="store-eyebrow"><span /> THE ALPHA SIGNATURE</p><h1>{product.name}</h1><p className="store-detail-description">{product.description} A confident fragrance, carefully composed to stay with you through the day.</p><div className="store-detail-price"><strong>{money(product.price)}</strong><s>{money(product.mrp)}</s><span>{Math.round((1 - product.price / product.mrp) * 100)}% OFF</span></div><p className="store-tax-note">Inclusive of all taxes</p><div className="store-quantity"><span>QUANTITY</span><div><button aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((count) => count - 1)} type="button">−</button><strong>{quantity}</strong><button aria-label="Increase quantity" disabled={quantity >= Math.min(10, product.stock)} onClick={() => setQuantity((count) => count + 1)} type="button">+</button></div></div><button className="store-button store-button-dark store-detail-add" disabled={product.stock < 1} onClick={add} type="button">{product.stock < 1 ? "Currently sold out" : added ? "Added to your bag ✓" : "Add to bag"} <span>{money(product.price * quantity)} ↗</span></button><PincodeCheck value={pincode} onChange={setPincode} /><p className="store-stock-note">{product.stock > 0 ? "Thoughtfully made. Ready to ship." : "This fragrance is currently sold out."}</p></div>
       </section>
+      <section className="store-section store-reviews"><p className="store-eyebrow">VERIFIED CUSTOMER NOTES</p><h2>Made a <em>lasting impression?</em></h2>{reviews.length ? reviews.map((review) => <article className="store-review" key={review._id}><strong>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</strong><h3>{review.title || "Customer review"}</h3><p>{review.body}</p><small>{review.customerName} · verified purchase</small></article>) : <p className="store-muted">No approved reviews yet.</p>}</section>
     </div>
   );
 }
@@ -192,7 +216,21 @@ function CartPage({ cart, setCart, navigate }) {
       .catch(() => { setApplied(null); setCouponError("This coupon no longer applies to your cart."); window.localStorage.removeItem(COUPON_KEY); });
   }, [subtotal]);
   function changeQuantity(id, delta) {
-    setCart((items) => items.map((item) => item._id === id ? { ...item, quantity: Math.max(1, Math.min(Math.min(10, item.stock), item.quantity + delta)) } : item));
+    const current = cart.find((item) => item._id === id);
+    if (!current) return;
+    const nextQuantity = Math.max(1, Math.min(Math.min(10, current.stock), current.quantity + delta));
+    const addedQuantity = nextQuantity - current.quantity;
+    if (addedQuantity > 0) {
+      trackCommerceEvent("add_to_cart", {
+        id: current._id,
+        name: current.name,
+        price: current.price,
+        quantity: addedQuantity,
+        currency: "INR",
+      });
+    }
+    if (!addedQuantity) return;
+    setCart((items) => items.map((item) => item._id === id ? { ...item, quantity: nextQuantity } : item));
   }
   async function applyCoupon(event) {
     event.preventDefault();
@@ -210,6 +248,23 @@ function CartPage({ cart, setCart, navigate }) {
       setBusy(false);
     }
   }
+  function addRecommendation(product) {
+    const existing = cart.find((item) => item._id === product._id);
+    const addedQuantity = Math.max(0, Math.min(Math.min(10, product.stock) - (existing?.quantity || 0), 1));
+    if (!addedQuantity) return;
+    trackCommerceEvent("add_to_cart", {
+      id: product._id,
+      name: product.name,
+      price: product.price,
+      quantity: addedQuantity,
+    });
+    setCart((items) => {
+      const item = items.find((row) => row._id === product._id);
+      return item
+        ? items.map((row) => row._id === product._id ? { ...row, quantity: row.quantity + addedQuantity } : row)
+        : [...items, { ...product, quantity: addedQuantity }];
+    });
+  }
   if (!cart.length) return <section className="store-empty-page"><p className="store-eyebrow">YOUR BAG / 00</p><span className="empty-bag-icon">✳</span><h1>Your next signature<br /><em>is waiting.</em></h1><p>Your bag is taking a quiet moment. Let’s find something that feels like you.</p><button className="store-button store-button-dark" onClick={() => navigate("/products")} type="button">Explore the collection <span>↗</span></button></section>;
   const total = afterDiscount + shipping;
   const recommendations = cart[0]._id;
@@ -218,7 +273,7 @@ function CartPage({ cart, setCart, navigate }) {
       <p className="store-eyebrow"><span /> YOUR BAG / {String(cart.reduce((sum, item) => sum + item.quantity, 0)).padStart(2, "0")}</p><h1 className="store-page-title">A good choice.</h1>
       <div className="cart-layout">
         <div className="cart-items-column"><FreeShippingBar subtotal={afterDiscount} /><div className="cart-items">{cart.map((item) => <article className="cart-item" key={item._id}><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><img src={item.imageUrl} alt={item.name} /></a><div className="cart-item-details"><a href={`/products/${item.slug}`} onClick={(event) => { event.preventDefault(); navigate(`/products/${item.slug}`); }}><h2>{item.name}</h2></a><span>{item.category}</span><div className="cart-item-quantity"><button aria-label={`Decrease ${item.name} quantity`} disabled={item.quantity <= 1} onClick={() => changeQuantity(item._id, -1)} type="button">−</button><span>{item.quantity}</span><button aria-label={`Increase ${item.name} quantity`} disabled={item.quantity >= Math.min(10, item.stock)} onClick={() => changeQuantity(item._id, 1)} type="button">+</button></div></div><div className="cart-item-price"><strong>{money(item.price * item.quantity)}</strong><s>{money(item.mrp * item.quantity)}</s><button onClick={() => setCart((items) => items.filter((row) => row._id !== item._id))} type="button">Remove</button></div></article>)}</div>
-          <FrequentlyBoughtTogether products={cart} currentId={recommendations} addToCart={(product) => setCart((items) => { const existing = items.find((item) => item._id === product._id); return existing ? items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(10, item.quantity + 1) } : item) : [...items, { ...product, quantity: 1 }]; })} />
+          <FrequentlyBoughtTogether products={cart} currentId={recommendations} addToCart={addRecommendation} />
         </div>
         <aside className="cart-summary"><p className="store-eyebrow">ORDER SUMMARY</p><h2>The good stuff.</h2><div className="cart-summary-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>{applied && <div className="cart-summary-line cart-discount"><span>Coupon · {applied.code}</span><span>−{money(discount)}</span></div>}<div className="cart-summary-line"><span>Shipping</span><span>{shipping ? money(shipping) : "FREE"}</span></div><div className="coupon-form-wrap"><label htmlFor="coupon-code">HAVE A CODE?</label><form className="coupon-form" onSubmit={applyCoupon}><input id="coupon-code" maxLength="30" onChange={(event) => setCouponCode(event.target.value.toUpperCase())} placeholder="Enter code" value={couponCode} /><button disabled={busy || !subtotal} type="submit">{busy ? "…" : applied ? "Applied ✓" : "Apply"}</button></form>{couponError && <p className="coupon-error" role="alert">{couponError}</p>}<div className="available-coupons">{coupons.filter((coupon) => subtotal >= coupon.minimumOrderValue).map((coupon) => <button key={coupon.code} onClick={() => setCouponCode(coupon.code)} type="button">{coupon.code} · {coupon.type === "percentage" ? `${coupon.value}% off` : `${money(coupon.value)} off`}</button>)}</div></div><div className="cart-summary-total"><strong>Total</strong><strong>{money(total)}</strong></div><p className="cart-tax-note">Tax included. Shipping calculated above.</p><button className="store-button store-button-dark checkout-button" onClick={() => navigate("/checkout")} type="button">Continue to checkout <span>↗</span></button><a className="keep-shopping" href="/products" onClick={(event) => { event.preventDefault(); navigate("/products"); }}>Keep exploring ↗</a><p className="payment-note">Secure checkout · Guest checkout available</p></aside>
       </div>
@@ -238,6 +293,8 @@ function FrequentlyBoughtTogether({ products, currentId, addToCart }) {
 }
 
 function CheckoutPage({ cart, setCart, navigate }) {
+  const checkoutEventSent = useRef(false);
+  const [attribution] = useState(() => captureFirstTouch(window.location.search, window.localStorage));
   const [form, setForm] = useState({ fullName: "", phone: "", email: "", address: "", pincode: "", city: "", state: "" });
   const [pincodeResult, setPincodeResult] = useState(null);
   const [couponCode] = useState(() => window.localStorage.getItem(COUPON_KEY) || "");
@@ -249,6 +306,21 @@ function CheckoutPage({ cart, setCart, navigate }) {
   const discount = coupon?.discount || 0;
   const shipping = subtotal - discount >= FREE_SHIPPING_THRESHOLD ? 0 : 49;
   const total = subtotal - discount + (cart.length ? shipping : 0);
+
+  useEffect(() => {
+    if (!cart.length || checkoutEventSent.current) return;
+    checkoutEventSent.current = true;
+    trackCommerceEvent("begin_checkout", {
+      value: total,
+      currency: "INR",
+      items: cart.map((item) => ({
+        item_id: String(item._id),
+        item_name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+    });
+  }, []);
 
   useEffect(() => {
     if (couponCode && subtotal) api.validateCoupon(couponCode, subtotal).then(setCoupon).catch(() => setCoupon(null));
@@ -306,6 +378,7 @@ function CheckoutPage({ cart, setCart, navigate }) {
         address: form.address,
         pincode: form.pincode,
         couponCode: coupon?.code || "",
+        utm: attribution,
       }, token);
       window.localStorage.setItem(CHECKOUT_ORDER_KEY, JSON.stringify({
         orderNumber: result.orderNumber,
@@ -385,6 +458,7 @@ function LoginAndAccount({ navigate }) {
             <div><span>GOOD TO HAVE YOU BACK</span><h2>{customer.fullName || customer.phone}</h2></div>
             <button className="store-button store-button-outline" onClick={signOut} type="button">Sign out</button>
           </div>
+          <div className="account-loyalty"><strong>{customer.loyaltyPoints || 0} loyalty points</strong><span>Your referral code: <b>{customer.referralCode || "Loading…"}</b></span><small>Earn 1 point for every ₹100 of a delivered order.</small></div>
           <h2 className="account-orders-title">Your orders <span>{orders.length}</span></h2>
           {orders.length ? (
             <div className="account-order-list">
@@ -453,7 +527,13 @@ function CheckoutSuccess({ orderNumber, navigate }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(window.localStorage.getItem(CHECKOUT_ORDER_KEY) || "{}");
-      setCheckoutToken(saved.orderNumber === orderNumber ? saved.checkoutToken || "" : "");
+      const resumeToken = new URLSearchParams(window.location.search).get("checkoutToken");
+      const token = resumeToken || (saved.orderNumber === orderNumber ? saved.checkoutToken || "" : "");
+      setCheckoutToken(token);
+      if (resumeToken) {
+        window.localStorage.setItem(CHECKOUT_ORDER_KEY, JSON.stringify({ orderNumber, checkoutToken: resumeToken }));
+        window.history.replaceState({}, "", `/checkout/success/${encodeURIComponent(orderNumber)}`);
+      }
     } catch (storageError) {
       console.error("Could not read this checkout’s local reference.", storageError);
     }
@@ -463,6 +543,17 @@ function CheckoutSuccess({ orderNumber, navigate }) {
     if (!checkoutToken && !customerToken) return;
     refreshOrder().catch((requestError) => setError(requestError.message));
   }, [checkoutToken, customerToken, orderNumber]);
+
+  useEffect(() => {
+    if (!summary || !["Paid", "CODConfirmed"].includes(summary.status)) return;
+    trackPurchaseOnce(orderNumber, {
+      value: summary.amountPaid + summary.codDue || summary.amount,
+      currency: "INR",
+      items: summary.items || [],
+      variant: summary.headlineVariant,
+      campaign: summary.campaign,
+    });
+  }, [orderNumber, summary]);
 
   async function startOnlinePayment(mode) {
     setBusy(true); setError(""); setNotice("");
@@ -523,6 +614,13 @@ function CheckoutSuccess({ orderNumber, navigate }) {
         confirmed: codConfirmed,
       }, customerToken);
       setSummary(result);
+      trackPurchaseOnce(orderNumber, {
+        value: result.amountPaid + result.codDue || result.amount,
+        currency: "INR",
+        items: result.items || [],
+        variant: result.headlineVariant,
+        campaign: result.campaign,
+      });
       setNotice("COD order confirmed. Please pay the delivery amount when it arrives.");
     } catch (requestError) {
       setError(requestError.message);
@@ -579,10 +677,19 @@ function CheckoutSuccess({ orderNumber, navigate }) {
 export default function Storefront({ path, cart, setCart, navigate }) {
   const { products, error } = useStoreProducts();
   function addToCart(product, quantity = 1) {
+    const current = cart.find((item) => item._id === product._id);
+    const addedQuantity = Math.max(0, Math.min(Math.min(10, product.stock) - (current?.quantity || 0), quantity));
+    if (!addedQuantity) return;
+    trackCommerceEvent("add_to_cart", {
+      id: product._id,
+      name: product.name,
+      price: product.price,
+      quantity: addedQuantity,
+      currency: "INR",
+    });
     setCart((items) => {
-      const current = items.find((item) => item._id === product._id);
-      if (current) return items.map((item) => item._id === product._id ? { ...item, quantity: Math.min(Math.min(10, product.stock), item.quantity + quantity) } : item);
-      return [...items, { ...product, quantity: Math.min(Math.min(10, product.stock), quantity) }];
+      if (current) return items.map((item) => item._id === product._id ? { ...item, quantity: item.quantity + addedQuantity } : item);
+      return [...items, { ...product, quantity: addedQuantity }];
     });
   }
   const successMatch = path.match(/^\/checkout\/success\/([^/]+)$/);

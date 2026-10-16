@@ -63,6 +63,7 @@ function publicOrder(order) {
     items: (order.items?.length ? order.items : [order.product]).filter(Boolean).map((item) => ({
       name: item.name,
       quantity: item.quantity,
+      product: item.product || item.id || null,
     })),
     return: {
       eligible: Boolean(returnDeadline && order.fulfillmentStatus === "Delivered" && Date.now() <= returnDeadline.getTime()),
@@ -308,7 +309,7 @@ async function createRazorpayRefund(order, returnRequest, amount) {
 export async function updateReturn(req, res) {
   const id = validId(req.params.id, "return request");
   const nextStatus = text(req.body?.status, "Return status", 40, true);
-  const actor = text(req.body?.actor, "Operator name", 100) || "Support team";
+  const actor = text(req.staff?.fullName, "Staff name", 100, true);
   const note = text(req.body?.note, "Return note", 500);
   const manualRefundReference = text(req.body?.manualRefundReference, "Manual refund reference", 100);
   const returnRequest = await ReturnRequest.findById(id);
@@ -453,7 +454,7 @@ export async function updateSupportTicket(req, res) {
     throw new HttpError(400, "Choose Open, In progress, or Closed.");
   }
   const reply = text(req.body?.reply, "Reply", 3000);
-  const author = text(req.body?.author, "Operator name", 100) || "Support team";
+  const author = text(req.staff?.fullName, "Staff name", 100, true);
   if (nextStatus) ticket.status = nextStatus;
   if (reply) {
     if (ticket.replies.length >= 100) throw new HttpError(409, "This ticket has reached its reply limit.");

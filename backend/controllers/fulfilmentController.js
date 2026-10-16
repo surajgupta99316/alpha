@@ -8,6 +8,16 @@ import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import Sequence from "../models/Sequence.js";
 import { sendOrderNotification } from "../utils/orderNotifications.js";
+import { awardLoyaltyPoints } from "./crmController.js";
+
+async function awardDeliveredOrder(order) {
+  await awardLoyaltyPoints(order._id).catch((error) => {
+    console.error("Could not award loyalty points for the delivered order.", {
+      orderNumber: order.orderNumber,
+      error: error.message,
+    });
+  });
+}
 
 const PAGE_SIZE_MAX = 100;
 const BULK_LIMIT = 50;
@@ -47,8 +57,8 @@ function text(value, field, maxLength, required = false) {
   return result;
 }
 
-function actorName(value) {
-  return text(value, "Operator name", 100) || "Operations team";
+function actorName(req) {
+  return text(req.staff?.fullName, "Staff name", 100, true);
 }
 
 function fulfilmentStatusFilter(status) {
@@ -170,7 +180,7 @@ export async function changeFulfilmentStatus(req, res) {
   if (!order) throw new HttpError(404, "Order was not found.");
   const previousStatus = order.fulfillmentStatus;
   const nextStatus = text(req.body?.status, "Status", 40, true);
-  const actor = actorName(req.body?.actor);
+  const actor = actorName(req);
   const note = text(req.body?.note, "Timeline note", 500);
   if (!FULFILMENT_STATUSES.includes(nextStatus)) throw new HttpError(400, "Unknown fulfilment status.");
   if (nextStatus === previousStatus) throw new HttpError(409, "The order already has that fulfilment status.");
@@ -296,7 +306,7 @@ export async function addInternalNote(req, res) {
   if (!order) throw new HttpError(404, "Order was not found.");
   if (order.internalNotes.length >= 200) throw new HttpError(409, "This order has reached its internal note limit.");
   const body = text(req.body?.body, "Note", 2000, true);
-  order.internalNotes.push({ body, author: actorName(req.body?.author), createdAt: new Date() });
+  order.internalNotes.push({ body, author: actorName(req), createdAt: new Date() });
   await order.save();
   res.status(201).json({ notes: order.internalNotes });
 }
@@ -615,7 +625,7 @@ export async function downloadPackingList(req, res) {
 
 export async function bulkPack(req, res) {
   const orders = await getBulkOrders(req.body?.orderIds);
-  const actor = actorName(req.body?.actor);
+  const actor = actorName(req);
   const invalid = orders.find((order) => order.fulfillmentStatus !== "Confirmed");
   if (invalid) throw new HttpError(409, `${invalid.orderNumber} is ${invalid.fulfillmentStatus}; only Confirmed orders can be packed in bulk.`);
   const changedAt = new Date();
@@ -654,7 +664,7 @@ export async function bookShipment(req, res) {
   if (!Number.isFinite(weightKg) || weightKg < 0.01 || weightKg > 50) {
     throw new HttpError(400, "Shipment weight must be between 0.01 and 50 kg.");
   }
-  const actor = actorName(req.body?.actor);
+  const actor = actorName(req);
   const order = await Order.findById(id);
   if (!order) throw new HttpError(404, "Order was not found.");
   if (order.shipment?.awb) {
@@ -737,6 +747,7 @@ export async function handleCourierWebhook(req, res) {
   if (!order) throw new HttpError(404, "No order matches this AWB.");
   if (order.shipment.processedEvents?.includes(eventId)) {
     if (targetStatus === "Delivered") {
+      await awardDeliveredOrder(order);
       await sendOrderNotification(order, "delivered").catch((error) => {
         console.error("Could not record the delivered notification.", {
           orderNumber: order.orderNumber,
@@ -786,6 +797,7 @@ export async function handleCourierWebhook(req, res) {
     throw new HttpError(409, "Order changed while processing this courier event. Retry with the same event ID.");
   }
   if (targetStatus === "Delivered") {
+    await awardDeliveredOrder(saved);
     await sendOrderNotification(saved, "delivered").catch((error) => {
       console.error("Could not record the delivered notification.", {
         orderNumber: saved.orderNumber,
@@ -799,7 +811,7 @@ export async function handleCourierWebhook(req, res) {
 export async function resolveNdr(req, res) {
   const id = validOrderId(req.params.id);
   const action = text(req.body?.action, "NDR action", 20, true);
-  const actor = actorName(req.body?.actor);
+  const actor = actorName(req);
   if (!["reattempt", "cancel"].includes(action)) throw new HttpError(400, "Choose reattempt or cancel.");
   const order = await Order.findById(id);
   if (!order) throw new HttpError(404, "Order was not found.");

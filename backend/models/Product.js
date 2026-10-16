@@ -9,6 +9,8 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     mrp: { type: Number, required: true, min: 0 },
     stock: { type: Number, default: 100, min: 0 },
+    lowStockThreshold: { type: Number, default: 10, min: 0 },
+    hsnCode: { type: String, trim: true, maxlength: 20, default: "33030020" },
     imageUrl: { type: String, required: true, trim: true },
     active: { type: Boolean, default: true },
   },

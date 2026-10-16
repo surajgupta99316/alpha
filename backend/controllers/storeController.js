@@ -9,6 +9,7 @@ import Product from "../models/Product.js";
 import HttpError from "../utils/HttpError.js";
 import { createSessionToken, hashOtp, verifyOtpHash } from "../utils/customerAuth.js";
 import { deliverOtp } from "../utils/otpDelivery.js";
+import { generateReferralCode, saveAbandonedCartFromOrder } from "./crmController.js";
 
 const FREE_SHIPPING_THRESHOLD = 1499;
 const SHIPPING_FEE = 49;
@@ -34,6 +35,19 @@ function validPincode(value) {
   const pincode = cleanText(value, "Pincode", 6, true);
   if (!/^[0-9]{6}$/.test(pincode)) throw new HttpError(400, "Enter a valid 6-digit pincode.");
   return pincode;
+}
+
+function hasAttribution(value) {
+  return Boolean(value?.source || value?.medium || value?.campaign);
+}
+
+function emptyAttributionFilter(customerId) {
+  return {
+    _id: customerId,
+    "firstUtm.source": { $in: ["", null] },
+    "firstUtm.medium": { $in: ["", null] },
+    "firstUtm.campaign": { $in: ["", null] },
+  };
 }
 
 function deliveryEstimate(deliveryDays) {
@@ -206,7 +220,9 @@ export async function verifyLoginOtp(req, res) {
 }
 
 export async function getMyAccount(req, res) {
-  res.json({ customer: req.customer });
+  const referralCode = await generateReferralCode(req.customer._id);
+  const customer = await Customer.findById(req.customer._id).select("phone fullName email loyaltyPoints referralCode").lean();
+  res.json({ customer: { ...customer, referralCode } });
 }
 
 export async function getMyOrders(req, res) {
@@ -223,6 +239,8 @@ export async function createCheckoutOrder(req, res) {
   const checkoutToken = cleanText(body.checkoutToken, "Checkout token", 80, true);
   const previousOrder = await Order.findOne({ checkoutToken }).select("orderNumber subtotal discount shipping amount");
   if (previousOrder) {
+    const existing = await Order.findById(previousOrder._id);
+    if (existing) await saveAbandonedCartFromOrder(existing);
     return res.status(200).json({
       orderNumber: previousOrder.orderNumber,
       subtotal: previousOrder.subtotal,
@@ -275,6 +293,12 @@ export async function createCheckoutOrder(req, res) {
   const pincodeCode = validPincode(body.pincode);
   const pincode = await Pincode.findOne({ code: pincodeCode, serviceable: true }).lean();
   if (!pincode) throw new HttpError(400, "This pincode is not serviceable.");
+  const attribution = body.utm && typeof body.utm === "object" && !Array.isArray(body.utm) ? body.utm : {};
+  const utm = {
+    source: cleanText(attribution.source, "UTM source", 200),
+    medium: cleanText(attribution.medium, "UTM medium", 200),
+    campaign: cleanText(attribution.campaign, "UTM campaign", 200),
+  };
 
   let customer;
   if (req.customer) {
@@ -287,12 +311,25 @@ export async function createCheckoutOrder(req, res) {
       { new: true, runValidators: true },
     );
     if (!customer) throw new HttpError(401, "Please sign in again before checking out.");
+    if (!hasAttribution(customer.firstUtm) && hasAttribution(utm)) {
+      await Customer.updateOne(emptyAttributionFilter(customer._id), { $set: { firstUtm: utm } });
+    }
   } else {
     customer = await Customer.findOneAndUpdate(
       { phone },
-      { $setOnInsert: { phone, fullName, ...(email ? { email } : {}) } },
+      {
+        $setOnInsert: {
+          phone,
+          fullName,
+          ...(email ? { email } : {}),
+          firstUtm: utm,
+        },
+      },
       { upsert: true, new: true, runValidators: true },
     );
+    if (!hasAttribution(customer.firstUtm) && hasAttribution(utm)) {
+      await Customer.updateOne(emptyAttributionFilter(customer._id), { $set: { firstUtm: utm } });
+    }
   }
 
   let discount = 0;
@@ -343,6 +380,7 @@ export async function createCheckoutOrder(req, res) {
         city: pincode.city,
         state: pincode.state,
       },
+      utm,
       subtotal,
       discount,
       shipping,
@@ -350,6 +388,7 @@ export async function createCheckoutOrder(req, res) {
       amount: subtotal - discount + shipping,
       status: "PendingPayment",
     });
+    await saveAbandonedCartFromOrder(order);
     return res.status(201).json({
       orderNumber: order.orderNumber,
       subtotal,

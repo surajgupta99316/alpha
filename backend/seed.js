@@ -2,6 +2,8 @@ import LandingPage from "./models/LandingPage.js";
 import Coupon from "./models/Coupon.js";
 import Pincode from "./models/Pincode.js";
 import Product from "./models/Product.js";
+import bcrypt from "bcryptjs";
+import StaffUser from "./models/StaffUser.js";
 
 const products = [
   {
@@ -51,6 +53,7 @@ const products = [
 ];
 
 export async function seedDatabase() {
+  await ensureInitialAdmin();
   for (const product of products) {
     await Product.updateOne({ slug: product.slug }, { $setOnInsert: product }, { upsert: true });
   }
@@ -115,6 +118,7 @@ export async function seedDatabase() {
         product: bold._id,
         slug: "alpha-bold",
         headline: "Make your presence unforgettable.",
+        variantHeadline: "Leave a lasting impression, every day.",
         subheadline: "Meet Alpha Bold: your new signature, from the first hello to the last goodbye.",
         heroImage:
           "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=1400&q=82",
@@ -152,6 +156,30 @@ export async function seedDatabase() {
     },
     { upsert: true },
   );
+  await LandingPage.updateOne(
+    { slug: "alpha-bold", variantHeadline: { $exists: false } },
+    { $set: { variantHeadline: "Leave a lasting impression, every day." } },
+  );
 
   console.log("Sample products, serviceable pincodes, coupons, and the editable Alpha Bold campaign are ready.");
+}
+
+async function ensureInitialAdmin() {
+  if (await StaffUser.exists({})) return;
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() || "";
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD || "";
+  if (!email && !password) {
+    console.warn("No staff account exists. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD in .env to create the first admin.");
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,200}$/.test(password)) {
+    throw new Error("Set a valid BOOTSTRAP_ADMIN_EMAIL and a 12+ character BOOTSTRAP_ADMIN_PASSWORD with uppercase, lowercase, a number, and a symbol.");
+  }
+  await StaffUser.create({
+    email,
+    fullName: "Alpha Admin",
+    passwordHash: await bcrypt.hash(password, 12),
+    role: "admin",
+  });
+  console.log(`Created the initial staff admin account for ${email}.`);
 }
