@@ -1,0 +1,117 @@
+.fulfilment-shell { min-height: 100vh; color: #191b18; background: #f4f2ec; }
+.fulfilment-header { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 5vw; border-bottom: 1px solid #d9d8d0; }
+.fulfilment-header .wordmark { font-size: 20px; font-weight: 700; letter-spacing: -.09em; white-space: nowrap; }
+.fulfilment-header .wordmark span { margin-left: 3px; font-weight: 400; }
+.fulfilment-title { display: grid; gap: 4px; text-align: center; }
+.fulfilment-title span { color: #777970; font-size: 8px; letter-spacing: .16em; font-weight: 700; }
+.fulfilment-title strong { font-size: 12px; }
+.fulfilment-header-links { display: flex; align-items: center; gap: 19px; }
+.fulfilment-header-links a { border-bottom: 1px solid #a3a49b; padding: 7px 0; font-size: 10px; font-weight: 700; }
+.fulfilment-content { max-width: 1440px; margin: 0 auto; padding: 58px 5vw 90px; }
+.fulfilment-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; }
+.fulfilment-heading h1 { margin: 10px 0 0; font-family: "Playfair Display", Georgia, serif; font-size: clamp(42px, 5vw, 66px); line-height: 1.02; font-weight: 500; letter-spacing: -.055em; }
+.fulfilment-heading h1 em { font-weight: 500; }
+.operator-field { display: grid; gap: 8px; width: min(100%, 260px); color: #777970; font-size: 8px; letter-spacing: .14em; font-weight: 700; }
+.operator-field input, .fulfilment-filters input, .fulfilment-filters select, .fulfilment-status-actions select, .fulfilment-status-actions input, .fulfilment-booking input, .fulfilment-note-form textarea {
+  width: 100%; min-height: 42px; border: 1px solid #d9d8d0; border-radius: 0; padding: 10px 11px; background: #fff; color: #191b18; font-size: 12px; letter-spacing: normal;
+}
+.fulfilment-warning { margin: 28px 0 22px; padding: 13px 15px; border-left: 3px solid #d5c16d; background: #f0eddf; color: #696858; font-size: 11px; line-height: 1.6; }
+.fulfilment-warning strong { color: #37382f; }
+.fulfilment-error, .fulfilment-notice { margin: 16px 0; padding: 12px 14px; font-size: 12px; }
+.fulfilment-error { color: #8d3027; background: #f8e6e1; }
+.fulfilment-notice { color: #3e6334; background: #e8efdf; }
+.fulfilment-filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(3, minmax(130px, 1fr)) repeat(2, minmax(125px, .8fr)); gap: 12px; margin: 28px 0 20px; padding: 18px; background: #fff; border: 1px solid #e2e0d8; }
+.fulfilment-filters label, .fulfilment-status-actions label, .fulfilment-booking label { display: grid; gap: 7px; color: #777970; font-size: 8px; letter-spacing: .12em; font-weight: 700; }
+.fulfilment-orders { border: 1px solid #e2e0d8; background: #fff; }
+.fulfilment-list-heading { display: flex; justify-content: space-between; align-items: end; padding: 20px 20px 16px; }
+.fulfilment-list-heading .section-kicker { margin: 0; }
+.fulfilment-list-heading h2 { margin: 8px 0 0; font-size: 25px; }
+.fulfilment-list-heading h2 span { color: #888980; font-size: 12px; font-weight: 400; }
+.fulfilment-list-heading > span { color: #777970; font-size: 10px; }
+.fulfilment-bulk-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-top: 1px solid #e2e0d8; background: #f8f7f3; }
+.fulfilment-bulk-bar strong { margin-right: auto; font-size: 11px; }
+.fulfilment-bulk-bar button, .fulfilment-pagination button, .fulfilment-close, .fulfilment-note-form button, .fulfilment-status-actions button, .fulfilment-pdf-actions button, .fulfilment-booking button, .fulfilment-ndr button {
+  min-height: 34px; padding: 8px 11px; border: 1px solid #d9d8d0; background: #fff; font-size: 10px; font-weight: 700; cursor: pointer;
+}
+.fulfilment-bulk-bar button:hover, .fulfilment-pagination button:not(:disabled):hover, .fulfilment-close:hover, .fulfilment-note-form button:hover, .fulfilment-status-actions button:hover, .fulfilment-pdf-actions button:hover, .fulfilment-booking button:hover, .fulfilment-ndr button:hover { background: #e8e8d9; }
+.fulfilment-bulk-bar button:disabled, .fulfilment-pagination button:disabled, .fulfilment-pdf-actions button:disabled, .fulfilment-status-actions button:disabled, .fulfilment-booking button:disabled, .fulfilment-ndr button:disabled { opacity: .45; cursor: not-allowed; }
+.fulfilment-table-wrap { overflow-x: auto; }
+.fulfilment-table { width: 100%; border-collapse: collapse; text-align: left; }
+.fulfilment-table th { padding: 11px 13px; border-top: 1px solid #e7e5de; border-bottom: 1px solid #e7e5de; color: #777970; font-size: 8px; letter-spacing: .12em; }
+.fulfilment-table td { padding: 13px; border-bottom: 1px solid #eeece6; vertical-align: middle; font-size: 11px; }
+.fulfilment-table tr.selected { background: #faf9f1; }
+.fulfilment-table td small { display: block; margin-top: 5px; color: #85867e; font-size: 9px; }
+.fulfilment-table input[type="checkbox"] { accent-color: #191b18; }
+.fulfilment-order-link { padding: 0; border: 0; border-bottom: 1px solid #a3a49b; background: none; font-size: 11px; font-weight: 700; cursor: pointer; }
+.fulfilment-status { display: inline-block; padding: 6px 8px; background: #ecebe4; font-size: 9px; white-space: nowrap; }
+.fulfilment-status.status-delivered, .fulfilment-status.status-confirmed { background: #e4edce; }
+.fulfilment-status.status-cancelled, .fulfilment-status.status-rto, .fulfilment-status.status-returned { background: #f4e4df; }
+.fulfilment-status.status-shipped, .fulfilment-status.status-out-for-delivery { background: #e4eaf0; }
+.fulfilment-empty { height: 100px; text-align: center; color: #85867e; }
+.fulfilment-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 14px; color: #777970; font-size: 10px; }
+.fulfilment-pagination button { min-height: 32px; }
+.fulfilment-detail { margin-top: 28px; padding: 24px; border: 1px solid #e2e0d8; background: #fff; }
+.fulfilment-detail-heading, .fulfilment-card-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.fulfilment-detail-heading h2 { margin: 7px 0 0; font-size: 23px; }
+.fulfilment-detail-heading .section-kicker { margin: 0; }
+.fulfilment-detail-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, .8fr); gap: 18px; margin-top: 19px; align-items: start; }
+.fulfilment-detail-main { display: grid; gap: 14px; }
+.fulfilment-card { padding: 17px; border: 1px solid #e7e5de; background: #fff; }
+.fulfilment-card h3 { margin: 0 0 13px; font-size: 14px; }
+.fulfilment-card p { margin: 7px 0; color: #686a63; font-size: 11px; line-height: 1.6; }
+.fulfilment-card p.fulfilment-refund-warning { padding: 9px; color: #873b2b; background: #f8e6e1; }
+.fulfilment-item { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid #eeece6; font-size: 11px; }
+.fulfilment-item.fulfilment-total { margin-top: 4px; border: 0; font-size: 12px; }
+.fulfilment-card-heading > span { color: #777970; font-size: 10px; }
+.fulfilment-timeline { display: grid; gap: 0; margin: 0; padding: 0 0 0 14px; border-left: 1px solid #d9d8d0; list-style: none; }
+.fulfilment-timeline li { position: relative; display: grid; gap: 5px; padding: 0 0 15px 10px; font-size: 11px; }
+.fulfilment-timeline li::before { position: absolute; top: 3px; left: -18px; width: 7px; height: 7px; border-radius: 50%; background: #aebd5b; content: ""; }
+.fulfilment-timeline li span, .fulfilment-timeline li small, .fulfilment-notes small { color: #81827a; font-size: 9px; }
+.fulfilment-notes { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.fulfilment-notes li { padding: 10px; background: #f8f7f3; }
+.fulfilment-notes li p { white-space: pre-wrap; color: #30312c; }
+.fulfilment-notes li.muted { color: #81827a; font-size: 10px; }
+.fulfilment-note-form { display: grid; justify-items: start; gap: 8px; }
+.fulfilment-note-form textarea { min-height: 76px; resize: vertical; }
+.fulfilment-note-form button, .fulfilment-status-actions button, .fulfilment-booking button { background: #191b18; color: #fff; border-color: #191b18; }
+.fulfilment-actions { position: sticky; top: 16px; }
+.fulfilment-status-actions, .fulfilment-pdf-actions, .fulfilment-booking, .fulfilment-shipment, .fulfilment-ndr { display: grid; gap: 10px; padding-top: 12px; margin-top: 12px; border-top: 1px solid #eeece6; }
+.fulfilment-status-actions label, .fulfilment-booking label { color: #777970; }
+.fulfilment-pdf-actions button { text-align: left; }
+.fulfilment-booking small, .fulfilment-shipment span, .fulfilment-shipment small { color: #777970; font-size: 9px; line-height: 1.5; }
+.fulfilment-shipment strong { font-size: 12px; }
+.fulfilment-shipment span { color: #30312c; }
+.fulfilment-ndr { padding: 13px; background: #faf4e7; border: 1px solid #eee2c4; }
+.fulfilment-ndr strong { font-size: 11px; }
+.fulfilment-ndr p { margin: 0; }
+.fulfilment-ndr button { text-align: left; }
+
+@media (max-width: 1000px) {
+  .fulfilment-filters { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+  .fulfilment-filters label:first-child { grid-column: span 2; }
+}
+@media (max-width: 720px) {
+  .fulfilment-header { min-height: 65px; flex-wrap: wrap; gap: 10px; padding: 10px 17px; }
+  .fulfilment-title { order: 3; width: 100%; text-align: left; }
+  .fulfilment-header-links { gap: 10px; }
+  .fulfilment-header-links a { font-size: 8px; }
+  .fulfilment-content { padding: 35px 16px 60px; }
+  .fulfilment-heading { align-items: start; flex-direction: column; }
+  .fulfilment-heading h1 { font-size: 48px; }
+  .operator-field { width: 100%; }
+  .fulfilment-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+  .fulfilment-filters label:first-child { grid-column: 1 / -1; }
+  .fulfilment-list-heading { align-items: start; }
+  .fulfilment-bulk-bar { align-items: stretch; }
+  .fulfilment-bulk-bar strong { flex: 0 0 100%; }
+  .fulfilment-bulk-bar button { flex: 1 1 42%; }
+  .fulfilment-table { min-width: 770px; }
+  .fulfilment-detail { padding: 15px; }
+  .fulfilment-detail-grid { grid-template-columns: 1fr; }
+  .fulfilment-actions { position: static; }
+}
+@media (max-width: 420px) {
+  .fulfilment-filters { grid-template-columns: 1fr; }
+  .fulfilment-filters label:first-child { grid-column: auto; }
+  .fulfilment-pagination { gap: 9px; font-size: 9px; }
+}

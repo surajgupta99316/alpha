@@ -11,6 +11,21 @@ async function request(path, options = {}) {
   return payload;
 }
 
+async function download(path, options = {}) {
+  const response = await fetch(`/api${path}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
+    },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "The PDF could not be generated.");
+  }
+  return response.blob();
+}
+
 export const api = {
   getProducts: () => request("/products"),
   getStoreProducts: (params = {}) => request(`/store/products?${new URLSearchParams(params)}`),
@@ -69,6 +84,51 @@ export const api = {
       body: JSON.stringify(page),
     }),
   getOrders: () => request("/admin/orders"),
+  getFulfilmentOrders: (filters) =>
+    request(`/admin/fulfilment/orders?${new URLSearchParams(filters)}`),
+  getFulfilmentOrder: (id) => request(`/admin/fulfilment/orders/${encodeURIComponent(id)}`),
+  updateFulfilmentStatus: (id, status, actor, note = "") =>
+    request(`/admin/fulfilment/orders/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, actor, note }),
+    }),
+  addFulfilmentNote: (id, body, author) =>
+    request(`/admin/fulfilment/orders/${encodeURIComponent(id)}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ body, author }),
+    }),
+  bookShipment: (id, weightKg, actor) =>
+    request(`/admin/fulfilment/orders/${encodeURIComponent(id)}/shipment`, {
+      method: "POST",
+      body: JSON.stringify({ weightKg, actor }),
+    }),
+  resolveNdr: (id, action, actor) =>
+    request(`/admin/fulfilment/orders/${encodeURIComponent(id)}/ndr`, {
+      method: "POST",
+      body: JSON.stringify({ action, actor }),
+    }),
+  downloadFulfilmentPdf: (type, orderIds) =>
+    download("/admin/fulfilment/bulk/print", {
+      method: "POST",
+      body: JSON.stringify({ type, orderIds }),
+    }),
+  downloadPackingList: (orderIds) =>
+    download("/admin/fulfilment/bulk/pick-list", {
+      method: "POST",
+      body: JSON.stringify({ orderIds }),
+    }),
+  packFulfilmentOrders: (orderIds, actor) =>
+    request("/admin/fulfilment/bulk/pack", {
+      method: "POST",
+      body: JSON.stringify({ orderIds, actor }),
+    }),
+  downloadManifest: (orderIds) =>
+    download("/admin/fulfilment/bulk/manifest", {
+      method: "POST",
+      body: JSON.stringify({ orderIds }),
+    }),
+  downloadOrderPdf: (id, type) =>
+    download(`/admin/fulfilment/orders/${encodeURIComponent(id)}/${type}.pdf`),
   createOrder: (order) =>
     request("/orders", {
       method: "POST",

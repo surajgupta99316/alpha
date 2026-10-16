@@ -65,6 +65,7 @@ function paymentSummary(order) {
     amountPaid: order.amountPaid || 0,
     codDue: order.codDue || 0,
     codLimit: COD_LIMIT,
+    refundStatus: order.refundStatus || "not_required",
   };
 }
 
@@ -75,6 +76,9 @@ export async function getPaymentSummary(req, res) {
 
 export async function createRazorpayOrder(req, res) {
   const order = await findOrder(req, req.body || {});
+  if (order.fulfillmentStatus === "Cancelled") {
+    throw new HttpError(409, "This order was cancelled and is no longer available for payment.");
+  }
   const convertingConfirmedCod = order.amountPaid === 0 && (
     (order.status === "CODConfirmed"
       && order.paymentMethod === "cod"
@@ -160,16 +164,35 @@ export async function createRazorpayOrder(req, res) {
     throw new HttpError(502, "Razorpay could not create a payment order. Check the test credentials and try again.");
   }
 
-  order.razorpayOrderId = gatewayOrder.id;
-  order.paymentMethod = mode;
-  order.paymentStatus = "created";
-  order.status = "PendingPayment";
-  order.codConversionPending = convertingConfirmedCod;
-  order.paymentAmount = amountDueNow;
-  order.prepaidDiscount = prepaidDiscount;
-  order.codDue = mode === "partial_cod" ? codDue : 0;
-  order.amount = mode === "prepaid" ? orderTotal - prepaidDiscount : orderTotal;
-  await order.save();
+  const updateFilter = {
+    _id: order._id,
+    status: order.status,
+    fulfillmentStatus: { $ne: "Cancelled" },
+    ...(order.razorpayOrderId
+      ? { razorpayOrderId: order.razorpayOrderId }
+      : { razorpayOrderId: { $exists: false } }),
+    ...(order.paymentStatus
+      ? { paymentStatus: order.paymentStatus }
+      : { paymentStatus: { $exists: false } }),
+  };
+  const updatedOrder = await Order.findOneAndUpdate(
+    updateFilter,
+    {
+      $set: {
+        razorpayOrderId: gatewayOrder.id,
+        paymentMethod: mode,
+        paymentStatus: "created",
+        status: "PendingPayment",
+        codConversionPending: convertingConfirmedCod,
+        paymentAmount: amountDueNow,
+        prepaidDiscount,
+        codDue: mode === "partial_cod" ? codDue : 0,
+        amount: mode === "prepaid" ? orderTotal - prepaidDiscount : orderTotal,
+      },
+    },
+    { new: true },
+  );
+  if (!updatedOrder) throw new HttpError(409, "The order changed while starting payment. Refresh and try again.");
 
   res.status(201).json({
     keyId,
@@ -177,7 +200,7 @@ export async function createRazorpayOrder(req, res) {
     amount: gatewayOrder.amount,
     currency: gatewayOrder.currency,
     mode,
-    summary: paymentSummary(order),
+    summary: paymentSummary(updatedOrder),
   });
 }
 
@@ -194,6 +217,8 @@ async function deductStockOnce(order, finalState) {
       {
         _id: order._id,
         stockDeductedAt: { $exists: true },
+        stockRestoreLock: { $exists: false },
+        fulfillmentStatus: { $ne: "Cancelled" },
         status: { $in: ["PendingPayment", "Failed", "CODPendingConfirmation"] },
       },
       { $set: { ...finalState, codConversionPending: false } },
@@ -210,6 +235,7 @@ async function deductStockOnce(order, finalState) {
       _id: order._id,
       stockDeductedAt: { $exists: false },
       settlementLock: { $exists: false },
+      fulfillmentStatus: { $ne: "Cancelled" },
       status: { $in: ["PendingPayment", "Failed", "CODPendingConfirmation"] },
     },
     { $set: { settlementLock: lock } },
@@ -271,6 +297,16 @@ export async function verifyRazorpayPayment(req, res) {
   if (!validSignature(`${razorpayOrderId}|${paymentId}`, signature, secret)) {
     throw new HttpError(400, "Razorpay payment verification failed. The order has not been marked paid.");
   }
+  if (order.fulfillmentStatus === "Cancelled") {
+    order.status = "Paid";
+    order.paymentStatus = "paid";
+    order.razorpayPaymentId = paymentId;
+    order.razorpaySignature = signature;
+    order.amountPaid = order.paymentAmount;
+    order.refundStatus = "refund_pending";
+    await order.save();
+    return res.json(paymentSummary(order));
+  }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
     return res.json(paymentSummary(order));
   }
@@ -287,6 +323,9 @@ export async function verifyRazorpayPayment(req, res) {
 
 export async function confirmCashOnDelivery(req, res) {
   const order = await findOrder(req, req.body || {});
+  if (order.fulfillmentStatus === "Cancelled") {
+    throw new HttpError(409, "This order was cancelled and cannot be confirmed for COD.");
+  }
   if (order.status === "CODConfirmed") return res.json(paymentSummary(order));
   if (!["PendingPayment", "Failed", "CODPendingConfirmation"].includes(order.status)) {
     throw new HttpError(409, "This order is not available for COD confirmation.");
@@ -350,6 +389,9 @@ export async function handleRazorpayWebhook(req, res) {
   } catch {
     throw new HttpError(400, "Invalid Razorpay webhook payload.");
   }
+  if (!event || typeof event !== "object" || Array.isArray(event)) {
+    throw new HttpError(400, "Invalid Razorpay webhook payload.");
+  }
   const payment = event.payload?.payment?.entity;
   const gatewayOrderId = payment?.order_id;
   if (!gatewayOrderId || !["payment.captured", "payment.failed"].includes(event.event)) {
@@ -370,6 +412,21 @@ export async function handleRazorpayWebhook(req, res) {
 
   if (payment.currency !== "INR" || payment.amount !== order.paymentAmount * 100) {
     throw new HttpError(400, "Captured Razorpay amount does not match the server order.");
+  }
+  if (order.fulfillmentStatus === "Cancelled") {
+    await Order.updateOne(
+      { _id: order._id, fulfillmentStatus: "Cancelled", status: { $nin: ["Paid", "CODConfirmed"] } },
+      {
+        $set: {
+          status: "Paid",
+          paymentStatus: "paid",
+          razorpayPaymentId: payment.id,
+          amountPaid: order.paymentAmount,
+          refundStatus: "refund_pending",
+        },
+      },
+    );
+    return res.json({ received: true, processed: true, refundPending: true });
   }
   if (order.status === "Paid" || (order.status === "CODConfirmed" && order.paymentStatus !== "created")) {
     return res.json({ received: true, processed: true });

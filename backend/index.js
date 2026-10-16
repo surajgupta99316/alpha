@@ -4,6 +4,7 @@ import express from "express";
 import { createServer } from "node:http";
 import mongoose from "mongoose";
 import { connectDatabase } from "./config/database.js";
+import { handleCourierWebhook } from "./controllers/fulfilmentController.js";
 import { handleRazorpayWebhook } from "./controllers/paymentController.js";
 import apiRouter from "./routes/api.js";
 import { seedDatabase } from "./seed.js";
@@ -26,6 +27,11 @@ app.post(
   "/api/payments/webhook",
   express.raw({ type: "application/json", limit: "30kb" }),
   (req, res, next) => Promise.resolve(handleRazorpayWebhook(req, res)).catch(next),
+);
+app.post(
+  "/api/courier/webhook",
+  express.raw({ type: "application/json", limit: "30kb" }),
+  (req, res, next) => Promise.resolve(handleCourierWebhook(req, res)).catch(next),
 );
 app.use(express.json({ limit: "30kb" }));
 app.use("/api", apiRouter);

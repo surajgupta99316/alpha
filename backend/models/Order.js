@@ -44,6 +44,42 @@ const orderSchema = new mongoose.Schema(
       enum: ["New", "PendingPayment", "Failed", "Paid", "CODPendingConfirmation", "CODConfirmed"],
       default: "New",
     },
+    fulfillmentStatus: {
+      type: String,
+      enum: ["New", "Confirmed", "Packed", "Shipped", "Out for delivery", "Delivered", "Cancelled", "RTO", "Returned"],
+      default: "New",
+      index: true,
+    },
+    statusTimeline: {
+      type: [{
+        status: { type: String, required: true, maxlength: 80 },
+        actor: { type: String, required: true, maxlength: 100 },
+        changedAt: { type: Date, required: true, default: Date.now },
+        note: { type: String, maxlength: 500 },
+      }],
+      default: () => [{ status: "New", actor: "System", changedAt: new Date() }],
+    },
+    internalNotes: {
+      type: [{
+        body: { type: String, required: true, maxlength: 2000 },
+        author: { type: String, required: true, maxlength: 100 },
+        createdAt: { type: Date, required: true, default: Date.now },
+      }],
+      default: [],
+    },
+    invoiceNumber: { type: String, unique: true, sparse: true },
+    shipment: {
+      provider: { type: String, enum: ["mock"] },
+      courierName: { type: String, maxlength: 100 },
+      awb: { type: String, unique: true, sparse: true },
+      trackingUrl: { type: String, maxlength: 500 },
+      weightKg: { type: Number, min: 0.01, max: 50 },
+      bookedAt: { type: Date },
+      ndrAttempts: { type: Number, min: 0, default: 0 },
+      ndrStatus: { type: String, enum: ["action_required", "reattempt_requested", "cancelled"] },
+      processedEvents: { type: [String], default: [] },
+      manifestId: { type: String, maxlength: 100 },
+    },
     paymentMethod: { type: String, enum: ["prepaid", "cod", "partial_cod"] },
     paymentStatus: {
       type: String,
@@ -58,6 +94,9 @@ const orderSchema = new mongoose.Schema(
     prepaidDiscount: { type: Number, min: 0, default: 0 },
     stockDeductedAt: { type: Date },
     settlementLock: { type: String, select: false },
+    stockRestoredAt: { type: Date },
+    stockRestoreLock: { type: String, select: false },
+    refundStatus: { type: String, enum: ["not_required", "refund_pending", "refunded"], default: "not_required" },
     codConversionPending: { type: Boolean, default: false },
     utm: {
       source: { type: String, trim: true, maxlength: 200 },
