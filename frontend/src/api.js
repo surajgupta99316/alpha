@@ -1,6 +1,7 @@
+const API_BASE_URL = import.meta.env.VITE_PUBLIC_API_URL || "";
 async function request(path, options = {}) {
   const staffToken = window.localStorage.getItem("alpha:staff-token");
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -15,7 +16,7 @@ async function request(path, options = {}) {
 
 async function download(path, options = {}) {
   const staffToken = window.localStorage.getItem("alpha:staff-token");
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
