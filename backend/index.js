@@ -18,15 +18,22 @@ const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 app.use(
   cors({
     origin(origin, callback) {
-      const allowedOrigins = [
-        clientOrigin,
-        "https://alpha-51ca61d7q-alpha-f4e4.vercel.app"
-      ];
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      // Allow requests with no origin
+      if (!origin) return callback(null, true);
+
+      // Dynamically allow any Vercel domain (handles all frontend deployment URLs)
+      if (origin.endsWith('.vercel.app')) return callback(null, true);
+
+      // Allow localhost for local development
       if (/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)) return callback(null, true);
+
+      // Allow explicitly defined client origin if it exists
+      if (typeof clientOrigin !== 'undefined' && origin === clientOrigin) return callback(null, true);
+
       callback(new Error("Origin is not allowed by CORS."));
     },
-  }),
+    credentials: true
+  })
 );
 app.post(
   "/api/payments/webhook",
