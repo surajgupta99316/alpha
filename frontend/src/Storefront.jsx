@@ -4,6 +4,7 @@ import { captureFirstTouch } from "./attribution.js";
 import { trackCommerceEvent, trackPurchaseOnce } from "./analytics.js";
 import { updateSeoMetadata } from "./seo.js";
 import { SupportPage, TrackingPage } from "./PostPurchase.jsx";
+import "./store.css";
 
 const FREE_SHIPPING_THRESHOLD = 1499;
 const AUTH_KEY = "alpha:customer-token";

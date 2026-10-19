@@ -15,5 +15,18 @@ export default defineConfig(({ mode }) => {
         "/api": `http://127.0.0.1:${apiPort}`,
       },
     },
+    build: {
+      minify: "esbuild",
+      cssMinify: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              return 'vendor'; // Unused/Third-party JS alag bundle mein jayega
+            }
+          }
+        }
+      }
+    }
   };
 });

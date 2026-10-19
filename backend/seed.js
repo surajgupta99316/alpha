@@ -172,8 +172,8 @@ async function ensureInitialAdmin() {
     console.warn("No staff account exists. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD in .env to create the first admin.");
     return;
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,200}$/.test(password)) {
-    throw new Error("Set a valid BOOTSTRAP_ADMIN_EMAIL and a 12+ character BOOTSTRAP_ADMIN_PASSWORD with uppercase, lowercase, a number, and a symbol.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,200}$/.test(password)) {
+    throw new Error("Set a valid BOOTSTRAP_ADMIN_EMAIL and a 6+ character BOOTSTRAP_ADMIN_PASSWORD with uppercase, lowercase, a number, and a symbol.");
   }
   await StaffUser.create({
     email,
