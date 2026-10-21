@@ -30,6 +30,16 @@ const textList = (value, field, maxItems = 12) => {
     .filter(Boolean);
 };
 
+function landingPageSaveError(error) {
+  if (error?.code === 11000) {
+    return new HttpError(
+      409,
+      "A campaign already uses this URL slug. To change its headlines, edit that campaign or choose a different URL slug.",
+    );
+  }
+  return error;
+}
+
 function landingPageInput(body) {
   const slug = text(body.slug, "URL slug", 80, { required: true }).toLowerCase();
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
@@ -155,7 +165,12 @@ export async function createLandingPage(req, res) {
   const input = landingPageInput(req.body || {});
   const product = await Product.findById(input.product);
   if (!product?.active) throw new HttpError(400, "Choose an active product.");
-  const page = await LandingPage.create(input);
+  let page;
+  try {
+    page = await LandingPage.create(input);
+  } catch (error) {
+    throw landingPageSaveError(error);
+  }
   res.status(201).json(page);
 }
 
@@ -164,10 +179,15 @@ export async function updateLandingPage(req, res) {
   const input = landingPageInput(req.body || {});
   const product = await Product.findById(input.product);
   if (!product?.active) throw new HttpError(400, "Choose an active product.");
-  const page = await LandingPage.findByIdAndUpdate(req.params.id, input, {
-    new: true,
-    runValidators: true,
-  });
+  let page;
+  try {
+    page = await LandingPage.findByIdAndUpdate(req.params.id, input, {
+      new: true,
+      runValidators: true,
+    });
+  } catch (error) {
+    throw landingPageSaveError(error);
+  }
   if (!page) throw new HttpError(404, "Campaign page was not found.");
   res.json(page);
 }
