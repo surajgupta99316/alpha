@@ -149,9 +149,6 @@ export async function validateCoupon(req, res) {
 }
 
 export async function requestLoginOtp(req, res) {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(503).json({ error: "Mobile OTP delivery is not configured for this deployment." });
-  }
   const phone = validPhone(req.body?.phone);
   const now = new Date();
   const prior = await OtpChallenge.findOne({ phone });

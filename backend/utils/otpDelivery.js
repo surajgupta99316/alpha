@@ -6,12 +6,6 @@ function twilioConfiguration() {
   const phoneNumber = process.env.TWILIO_PHONE_NUMBER?.trim();
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
   const configured = [accountSid, authToken, phoneNumber, messagingServiceSid].some(Boolean);
-  console.log("--- TWILIO ENV DEBUG ---");
-  console.log("Account SID mila?", !!accountSid);
-  console.log("Auth Token mila?", !!authToken);
-  console.log("Phone Number mila?", !!phoneNumber);
-  console.log("NODE_ENV kya hai?", process.env.NODE_ENV);
-  console.log("------------------------");
   if (!configured) return null;
   if (!accountSid || !authToken || (!phoneNumber && !messagingServiceSid)) {
     throw new HttpError(
